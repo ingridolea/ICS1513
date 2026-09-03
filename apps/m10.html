@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Precio mínimo y salario mínimo — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Precio m&iacute;nimo y salario m&iacute;nimo</h1>
+  <span>M10 &middot; Pol&iacute;ticas p&uacute;blicas</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="bien">Mercado de un bien</button>
+    <button class="tab" data-tab="laboral">Mercado del trabajo</button>
+    <button class="chip" data-layer="sobreoferta"><span class="dot" style="background:var(--c-policy)"></span>Sobreoferta</button>
+    <button class="chip" data-layer="bienestar"><span class="dot" style="background:var(--c-cs-line)"></span>Bienestar</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="top-bar">
+    <button class="tool-btn" data-preset="poco">Mismo m&iacute;nimo, trabajadores poco calificados</button>
+    <button class="tool-btn" data-preset="cal">Mismo m&iacute;nimo, trabajadores calificados</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Mercado con precio m&iacute;nimo</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg><span id="lg-d">Demanda</span></span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg><span id="lg-s">Oferta</span></span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-policy)" stroke-width="2.5"/></svg><span id="lg-p">Precio m&iacute;nimo</span></span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-cs)"></span>Excedente consumidor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-ps)"></span>Excedente productor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-transfer)"></span>Transferencia consumidor &rarr; productor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-dwl)"></span>P&eacute;rdida social</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Pol&iacute;tica</div>
+        <div class="sr"><div class="sh"><span class="sn" id="sn-f">Precio m&iacute;nimo</span><span class="sv" id="v-f">14.0</span></div>
+          <input type="range" data-p="f" min="0" max="34" step="0.5" value="14"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label" id="gl-d">Demanda &nbsp;P = a &minus; b&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (a)</span><span class="sv" id="v-a">20</span></div>
+          <input type="range" data-p="a" min="8" max="40" step="0.5" value="20"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (b) &mdash; mayor = m&aacute;s inel&aacute;stica</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label" id="gl-s">Oferta &nbsp;P = c + d&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (c)</span><span class="sv" id="v-c">2</span></div>
+          <input type="range" data-p="c" min="0" max="15" step="0.5" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (d) &mdash; mayor = m&aacute;s inel&aacute;stica</span><span class="sv" id="v-d">1.0</span></div>
+          <input type="range" data-p="d" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Mercado</div>
+      <div class="metric"><div class="ml" id="ml-qd">Cantidad demandada Q<sub>D</sub></div><div class="mv" id="m-qd">&mdash;</div></div>
+      <div class="metric"><div class="ml" id="ml-qs">Cantidad ofrecida Q<sub>S</sub></div><div class="mv" id="m-qs">&mdash;</div></div>
+      <div class="metric"><div class="ml" id="ml-sob">Sobreoferta</div><div class="mv" id="m-sob">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Efectos</div>
+      <div class="metric"><div class="ml">Transferencia al productor</div><div class="mv" id="m-tr">&mdash;</div></div>
+      <div class="metric"><div class="ml">P&eacute;rdida social</div><div class="mv" id="m-dwl">&mdash;</div></div>
+      <div class="metric"><div class="ml" id="ml-fuera">Unidades que no se venden</div><div class="mv" id="m-fuera">&mdash;</div></div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="wtable" id="tabla">
+      <thead><tr><th></th><th id="th0">Sin m&iacute;nimo</th><th id="th1">Con m&iacute;nimo</th><th>Cambio</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, bindTabs, bindPresets, initTools } = ICS;
+
+const defaults = { f: 14, a: 20, b: 1, c: 2, d: 1, tab: "bien" };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { sobreoferta: true, bienestar: true };
+const layers        = Object.assign({}, layerDefaults);
+
+// el mismo salario minimo (14) muerde en un mercado y no en el otro
+const presets = {
+  poco: { tab: "laboral", a: 20, b: 1, c: 2, d: 1, f: 14 },
+  cal:  { tab: "laboral", a: 30, b: 1, c: 2, d: 1, f: 14 }
+};
+
+const format = { f: v => v.toFixed(1), a: v => v.toFixed(1), b: v => v.toFixed(1),
+                 c: v => v.toFixed(1), d: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 390 });
+
+function render() {
+  const s = state;
+  const lab = s.tab === "laboral";
+  const D = q => s.a - s.b * q;
+  const S = q => s.c + s.d * q;
+  const Qeq = (s.a - s.c) / (s.b + s.d);
+  const Peq = D(Qeq);
+  const F = s.f;
+
+  const vinculante = F > Peq && s.a > s.c;
+  const Qd = Math.max(0, (s.a - F) / s.b);   // lo que los compradores quieren
+  const Qs = Math.max(0, (F - s.c) / s.d);   // lo que los vendedores ofrecen
+  const exceso = Qs - Qd;
+
+  // rotulos que cambian con el marco
+  const ejeX = lab ? "Cantidad de mano de obra" : "Cantidad";
+  const ejeY = lab ? "Salario" : "Precio";
+  const nomExceso = lab ? "Desempleo" : "Sobreoferta";
+  document.getElementById("lg-d").textContent = lab ? "Demanda de mano de obra" : "Demanda";
+  document.getElementById("lg-s").textContent = lab ? "Oferta de mano de obra" : "Oferta";
+  document.getElementById("lg-p").textContent = lab ? "Sueldo mínimo" : "Precio mínimo";
+  document.getElementById("sn-f").textContent = lab ? "Sueldo mínimo" : "Precio mínimo";
+  document.getElementById("gl-d").innerHTML = (lab ? "Demanda de mano de obra" : "Demanda") + " &nbsp;P = a − b·Q";
+  document.getElementById("gl-s").innerHTML = (lab ? "Oferta de mano de obra" : "Oferta") + " &nbsp;P = c + d·Q";
+  document.getElementById("ml-qd").innerHTML = lab ? "Empleo (mano de obra demandada)" : "Cantidad demandada Q<sub>D</sub>";
+  document.getElementById("ml-qs").innerHTML = lab ? "Mano de obra ofrecida" : "Cantidad ofrecida Q<sub>S</sub>";
+  document.getElementById("ml-sob").textContent = nomExceso;
+  document.getElementById("ml-fuera").textContent = lab ? "Trabajadores sin empleo" : "Unidades que no se venden";
+  document.getElementById("th0").textContent = lab ? "Sin sueldo mínimo" : "Sin mínimo";
+  document.getElementById("th1").textContent = lab ? "Con sueldo mínimo" : "Con mínimo";
+  document.getElementById("ptitle").textContent = vinculante
+    ? (lab ? "Sueldo mínimo por sobre el salario de equilibrio: aparece desempleo"
+           : "Precio mínimo por sobre el precio de equilibrio: aparece sobreoferta")
+    : (lab ? "Sueldo mínimo bajo el salario de equilibrio: no es vinculante"
+           : "Precio mínimo bajo el precio de equilibrio: no es vinculante");
+
+  const maxQ = Math.max(Qeq * 2.2, Qs * 1.12), maxP = Math.max(s.a, F) * 1.15;
+  plot.begin(maxQ, maxP).grid()
+      .axes(ejeX, ejeY, { skipP: [Peq, F], skipQ: [Qs, Qd, Qeq] });
+
+  const EC0 = 0.5 * (s.a - Peq) * Qeq, EP0 = 0.5 * (Peq - s.c) * Qeq;
+  let EC1 = EC0, EP1 = EP0, transf = 0, dwl = 0;
+
+  if (vinculante) {
+    EC1 = 0.5 * (s.a - F) * Qd;
+    EP1 = (F - s.c) * Qd - s.d * Qd * Qd / 2;
+    transf = (F - Peq) * Qd;
+    dwl = (EC0 + EP0) - (EC1 + EP1);
+  }
+
+  if (layers.bienestar) {
+    if (vinculante) {
+      plot.area([[0, s.a], [Qd, F], [0, F]], C.cs, C.csLine);
+      plot.area([[0, s.c], [Qd, S(Qd)], [Qd, F], [0, F]], C.ps, C.psLine);
+      plot.rect(0, Peq, Qd, F, C.transfer, C.muted);
+      plot.area([[Qd, F], [Qeq, Peq], [Qd, S(Qd)]], C.dwl, C.dwlLine);
+    } else {
+      plot.area([[0, s.a], [Qeq, Peq], [0, Peq]], C.cs, C.csLine);
+      plot.area([[0, s.c], [Qeq, Peq], [0, Peq]], C.ps, C.psLine);
+    }
+  }
+
+  plot.curve(D, C.demand, { width: 2.4, to: s.a / s.b });
+  plot.curve(S, C.supply, { width: 2.4 });
+
+  plot.seg(0, F, maxQ, F, C.policy, { width: 2.2 });
+  plot.tickP(F, lab ? "W̲" : "P̲", C.policy);
+
+  plot.seg(Qeq, 0, Qeq, Peq, C.muted, { dash: [4, 3], width: 1 });
+  plot.dot(Qeq, Peq, vinculante ? C.muted : C.txt);
+  plot.tickP(Peq, lab ? "W*" : "P*", C.muted);
+  plot.tickQ(Qeq, "Q*", C.muted);
+
+  if (vinculante && layers.sobreoferta) {
+    plot.seg(Qd, 0, Qd, F, C.muted, { dash: [4, 3], width: 1 });
+    plot.seg(Qs, 0, Qs, F, C.muted, { dash: [4, 3], width: 1 });
+    plot.tickQ(Qd, "Q_D", C.policy);
+    plot.tickQ(Qs, "Q_S", C.policy);
+    plot.spanH(Qd, Qs, F * 1.06, nomExceso + " " + fmt.n(exceso), C.policy);
+  }
+
+  plot.label(maxQ * 0.88, Math.max(D(maxQ * 0.88), 0), document.getElementById("lg-d").textContent,
+    C.demand, { dx: 4, dy: 13, align: "right", box: true });
+  plot.label(maxQ * 0.88, S(maxQ * 0.88), document.getElementById("lg-s").textContent,
+    C.supply, { dx: 4, dy: -6, align: "right", box: true });
+
+  document.getElementById("m-qd").textContent  = fmt.n(vinculante ? Qd : Qeq);
+  document.getElementById("m-qs").textContent  = fmt.n(vinculante ? Qs : Qeq);
+  document.getElementById("m-sob").textContent = vinculante ? fmt.n(exceso) : "0.00";
+  document.getElementById("m-tr").textContent  = fmt.n(transf);
+  document.getElementById("m-dwl").textContent = fmt.n(dwl);
+  document.getElementById("m-fuera").textContent = vinculante ? fmt.n(exceso) : "ninguno";
+
+  const fila = (nom, v0, v1) => {
+    const dif = v1 - v0;
+    return "<tr><td>" + nom + "</td><td>" + fmt.n(v0) + "</td><td>" + fmt.n(v1) + "</td>" +
+      '<td class="' + (dif > 0.005 ? "pos" : dif < -0.005 ? "neg" : "") + '">' +
+      (dif > 0.005 ? "+" : "") + fmt.n(dif) + "</td></tr>";
+  };
+  document.querySelector("#tabla tbody").innerHTML =
+    fila(lab ? "Excedente de las empresas" : "Excedente del consumidor", EC0, EC1) +
+    fila(lab ? "Excedente de los trabajadores" : "Excedente del productor", EP0, EP1) +
+    fila("Excedente total", EC0 + EP0, EC1 + EP1);
+
+  const nota = document.getElementById("note");
+  if (!vinculante) {
+    nota.textContent = lab
+      ? "El salario de equilibrio de este mercado (" + fmt.n(Peq) + ") ya está por sobre el mínimo legal, así que la política no lo toca. " +
+        "Es el caso de los trabajadores con más calificación y experiencia: el sueldo mínimo no es restrictivo para ellos."
+      : "El mínimo está bajo el precio de equilibrio, así que el mercado nunca lo toca y la política no cambia nada.";
+  } else if (lab) {
+    nota.textContent =
+      "Al sueldo mínimo las empresas quieren contratar " + fmt.n(Qd) + " y hay " + fmt.n(Qs) +
+      " personas buscando trabajo: " + fmt.n(exceso) + " quedan sin empleo. Los que conservan su trabajo ganan más " +
+      "(transferencia de " + fmt.n(transf) + "), los que no lo encuentran pierden su ingreso. " +
+      "En Chile el sueldo mínimo es de $539.000 desde el 1 de enero de 2026 para trabajadores entre 18 y 65 años, " +
+      "y su efecto se concentra en los mercados de menor calificación.";
+  } else {
+    nota.textContent =
+      "Al precio mínimo los vendedores ofrecen " + fmt.n(Qs) + " pero los compradores solo quieren " + fmt.n(Qd) +
+      ": sobran " + fmt.n(exceso) + " unidades. Los productores que sí venden reciben más (transferencia de " +
+      fmt.n(transf) + "), pero se transan menos unidades y aparece una pérdida social de " + fmt.n(dwl) + ".";
+  }
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+bindTabs(state, "tab", render);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, layers, layerDefaults, format, render,
+            canvas: "c-main", file: "m10-precio-minimo" });
+</script>
+</body>
+</html>

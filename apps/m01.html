@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demanda escalonada y disposición a pagar — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Demanda escalonada y disposici&oacute;n a pagar</h1>
+  <span>M1 &middot; Eficiencia de mercado</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="subasta">Subasta</button>
+    <button class="tab" data-tab="precio">Precio dado</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Curva de demanda por el &aacute;lbum</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Demanda (disposici&oacute;n a pagar de cada compradora)</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-policy)" stroke-width="2.5"/></svg>Precio de mercado</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-cs)"></span>Excedente del consumidor</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders">
+      <div class="slider-group">
+        <div class="group-label">Disposici&oacute;n a pagar</div>
+        <div class="sr"><div class="sh"><span class="sn">Taylor</span><span class="sv" id="v-v1">$100.000</span></div>
+          <input type="range" data-p="v1" min="10" max="120" step="5" value="100"></div>
+        <div class="sr"><div class="sh"><span class="sn">Billie</span><span class="sv" id="v-v2">$80.000</span></div>
+          <input type="range" data-p="v2" min="10" max="120" step="5" value="80"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Disposici&oacute;n a pagar</div>
+        <div class="sr"><div class="sh"><span class="sn">Rihanna</span><span class="sv" id="v-v3">$70.000</span></div>
+          <input type="range" data-p="v3" min="10" max="120" step="5" value="70"></div>
+        <div class="sr"><div class="sh"><span class="sn">Gaga</span><span class="sv" id="v-v4">$50.000</span></div>
+          <input type="range" data-p="v4" min="10" max="120" step="5" value="50"></div>
+      </div>
+      <div class="slider-group wide" id="g-subasta">
+        <hr class="divider">
+        <div class="group-label">Subasta</div>
+        <div class="sr"><div class="sh"><span class="sn">&Aacute;lbumes a la venta &mdash; el precio sube hasta que sobran compradoras</span><span class="sv" id="v-k">1</span></div>
+          <input type="range" data-p="k" min="1" max="4" step="1" value="1"></div>
+      </div>
+      <div class="slider-group wide" id="g-precio">
+        <hr class="divider">
+        <div class="group-label">Precio de mercado</div>
+        <div class="sr"><div class="sh"><span class="sn">Precio del &aacute;lbum</span><span class="sv" id="v-p">$80.000</span></div>
+          <input type="range" data-p="p" min="0" max="130" step="5" value="80"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="wtable" id="tabla">
+      <thead><tr><th>Compradora</th><th>Disposici&oacute;n a pagar</th><th>&iquest;Compra?</th><th>Paga</th><th>Excedente</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup">
+      <div class="mgroup-label">Mercado</div>
+      <div class="metric"><div class="ml">Precio</div><div class="mv" id="m-precio">&mdash;</div></div>
+      <div class="metric"><div class="ml">Cantidad transada</div><div class="mv" id="m-q">&mdash;</div></div>
+    </div>
+    <div class="mgroup">
+      <div class="mgroup-label">Bienestar</div>
+      <div class="metric"><div class="ml">Excedente del consumidor</div><div class="mv" id="m-ec">&mdash;</div></div>
+      <div class="metric"><div class="ml">Compradora marginal</div><div class="mv" id="m-marg">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, bindSliders, bindTabs, initTools } = ICS;
+
+const NOMBRES = ["Taylor", "Billie", "Rihanna", "Gaga"];
+
+const defaults = { v1: 100, v2: 80, v3: 70, v4: 50, k: 1, p: 80, tab: "subasta" };
+const state    = Object.assign({}, defaults);
+
+// los valores se guardan en miles de pesos
+const plata  = v => "$" + (v * 1000).toLocaleString("es-CL");
+const format = { v1: plata, v2: plata, v3: plata, v4: plata, p: plata, k: v => v };
+
+const plot = new Plot("c-main", { height: 360 });
+
+function render() {
+  const s = state;
+  document.getElementById("g-subasta").style.display = s.tab === "subasta" ? "" : "none";
+  document.getElementById("g-precio").style.display  = s.tab === "precio"  ? "" : "none";
+
+  // compradoras ordenadas de mayor a menor disposicion a pagar
+  const gente = [s.v1, s.v2, s.v3, s.v4]
+    .map((v, i) => ({ nombre: NOMBRES[i], v }))
+    .sort((x, y) => y.v - x.v);
+  const vals = gente.map(g => g.v);
+
+  // el precio: en la subasta lo fija la primera compradora excluida
+  let precio, qVend;
+  if (s.tab === "subasta") {
+    qVend = s.k;
+    precio = s.k < 4 ? vals[s.k] : 0;
+  } else {
+    precio = s.p;
+    qVend = vals.filter(v => v >= precio).length;
+  }
+  const compran = Math.min(qVend, vals.filter(v => v >= precio).length);
+
+  const maxP = Math.max(...vals, precio) * 1.28;
+  plot.begin(5, maxP).grid()
+      .axes("Cantidad de álbumes", "Precio del álbum", { noP: true, noQ: true });
+  [1, 2, 3, 4].forEach(q => plot.tickQ(q, String(q), C.muted));
+  vals.forEach(v => plot.tickP(v, plata(v), C.muted));
+
+  // excedente de cada compradora que efectivamente compra
+  for (let i = 0; i < compran; i++)
+    plot.rect(i, precio, i + 1, vals[i], C.cs, C.csLine);
+
+  plot.steps(vals, C.demand, { top: maxP });
+
+  // linea de precio
+  plot.seg(0, precio, 5, precio, C.policy, { width: 2 });
+  plot.tickP(precio, plata(precio), C.policy);
+
+  // rotulos de cada escalon
+  gente.forEach((g, i) => {
+    if (i >= 4) return;
+    plot.label(i + 0.5, vals[i], g.nombre, C.demand,
+      { dy: -7, align: "center", box: true });
+  });
+  plot.label(4, maxP * 0.14, "Demanda", C.demand, { dx: 8, box: true });
+
+  // tabla por compradora
+  const EC = gente.slice(0, compran).reduce((t, g) => t + (g.v - precio), 0);
+  document.querySelector("#tabla tbody").innerHTML = gente.map((g, i) => {
+    const si = i < compran;
+    return "<tr><td>" + g.nombre + "</td><td>" + plata(g.v) + "</td><td>" +
+      (si ? "sí" : "no") + "</td><td>" + (si ? plata(precio) : "—") + "</td>" +
+      '<td class="' + (si && g.v > precio ? "pos" : "") + '">' +
+      (si ? plata(g.v - precio) : "—") + "</td></tr>";
+  }).join("");
+
+  document.getElementById("m-precio").textContent = plata(precio);
+  document.getElementById("m-q").textContent = compran + (compran === 1 ? " álbum" : " álbumes");
+  document.getElementById("m-ec").textContent = plata(EC);
+  document.getElementById("m-marg").textContent =
+    compran > 0 ? gente[compran - 1].nombre : "ninguna";
+
+  const nota = document.getElementById("note");
+  if (s.tab === "subasta") {
+    nota.textContent = s.k < 4
+      ? "Con " + s.k + (s.k === 1 ? " álbum" : " álbumes") + " a la venta, la subasta termina apenas por sobre " +
+        plata(vals[s.k]) + ": es lo máximo que ofrece " + gente[s.k].nombre + ", la primera que queda fuera. " +
+        "Las que compran se llevan la diferencia entre lo que valoran el disco y lo que pagan."
+      : "Con un álbum para cada compradora ya no hay competencia que empuje el precio, así que este cae hasta el mínimo y el excedente es el máximo posible.";
+  } else {
+    nota.textContent = "A este precio compran las " + compran + " compradoras que valoran el álbum en " +
+      plata(precio) + " o más. La curva de demanda no es otra cosa que estas disposiciones a pagar ordenadas de mayor a menor.";
+  }
+}
+
+bindSliders(state, render, format);
+bindTabs(state, "tab", render);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m01-demanda-escalonada" });
+</script>
+</body>
+</html>

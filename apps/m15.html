@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Subsidio: excedentes y gasto fiscal — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Subsidio: cambios en los excedentes y gasto fiscal</h1>
+  <span>M15 &middot; Pol&iacute;ticas p&uacute;blicas</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="chip" data-layer="ec"><span class="dot" style="background:var(--c-cs-line)"></span>Excedente consumidor</button>
+    <button class="chip" data-layer="ep"><span class="dot" style="background:var(--c-ps-line)"></span>Excedente productor</button>
+    <button class="chip" data-layer="gasto"><span class="dot" style="background:var(--c-fiscal-line)"></span>Gasto fiscal</button>
+    <button class="chip" data-layer="dwl"><span class="dot" style="background:var(--c-dwl-line)"></span>P&eacute;rdida social</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title">Un subsidio es un impuesto al rev&eacute;s: la cu&ntilde;a se abre hacia el otro lado</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Demanda</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Oferta</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-cs)"></span>Excedente del consumidor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-ps)"></span>Excedente del productor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-fiscal)"></span>Gasto fiscal s&middot;Q&prime;</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-dwl)"></span>P&eacute;rdida social</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Pol&iacute;tica</div>
+        <div class="sr"><div class="sh"><span class="sn">Subsidio por unidad (s)</span><span class="sv" id="v-s">4.0</span></div>
+          <input type="range" data-p="s" min="0" max="12" step="0.5" value="4"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Demanda &nbsp;P = a &minus; b&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (a)</span><span class="sv" id="v-a">20</span></div>
+          <input type="range" data-p="a" min="8" max="40" step="0.5" value="20"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (b)</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Oferta &nbsp;P = c + d&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (c)</span><span class="sv" id="v-c">2</span></div>
+          <input type="range" data-p="c" min="0" max="15" step="0.5" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (d)</span><span class="sv" id="v-d">1.0</span></div>
+          <input type="range" data-p="d" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="wtable" id="tabla">
+      <thead><tr><th></th><th>Sin subsidio</th><th>Con subsidio</th><th>Cambio</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Mercado</div>
+      <div class="metric"><div class="ml">Cantidad Q&prime;</div><div class="mv" id="m-q">&mdash;</div></div>
+      <div class="metric"><div class="ml">Recibe el vendedor P<sub>S</sub></div><div class="mv" id="m-ps">&mdash;</div></div>
+      <div class="metric"><div class="ml">Paga el comprador P<sub>D</sub></div><div class="mv" id="m-pd">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Cuentas</div>
+      <div class="metric"><div class="ml">Gasto fiscal</div><div class="mv" id="m-gasto">&mdash;</div></div>
+      <div class="metric"><div class="ml">P&eacute;rdida social</div><div class="mv" id="m-dwl">&mdash;</div></div>
+      <div class="metric"><div class="ml">Unidades de m&aacute;s</div><div class="mv" id="m-dq">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, initTools } = ICS;
+
+const defaults = { s: 4, a: 20, b: 1, c: 2, d: 1 };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { ec: true, ep: true, gasto: true, dwl: true };
+const layers        = Object.assign({}, layerDefaults);
+
+const format = { s: v => v.toFixed(1), a: v => v.toFixed(1), b: v => v.toFixed(1),
+                 c: v => v.toFixed(1), d: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 400 });
+
+function render() {
+  const st = state;
+  const D = q => st.a - st.b * q;
+  const S = q => st.c + st.d * q;
+  const bd = st.b + st.d;
+  const Qeq = (st.a - st.c) / bd;
+  const Peq = D(Qeq);
+
+  const sub = st.s;
+  // con subsidio se transa mas: la cuna se abre al reves que con un impuesto
+  const Q1 = (st.a - st.c + sub) / bd;
+  const PS = st.c + st.d * Q1;      // lo que recibe el vendedor, contando el subsidio
+  const PD = PS - sub;              // lo que paga el comprador de su bolsillo
+
+  const maxQ = Math.max(Qeq * 2.1, Q1 * 1.15), maxP = Math.max(st.a, PS) * 1.12;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad", "Precio", { skipP: [PD, PS, Peq], skipQ: [Q1, Qeq] });
+
+  if (layers.ec) plot.area([[0, st.a], [Q1, PD], [0, PD]], C.cs, C.csLine);
+  if (layers.ep) plot.area([[0, st.c], [Q1, PS], [0, PS]], C.ps, C.psLine);
+  if (layers.gasto && sub > 0.01) plot.rect(0, PD, Q1, PS, C.fiscal, C.fiscalLine);
+  if (layers.dwl && sub > 0.01)
+    plot.area([[Qeq, Peq], [Q1, PS], [Q1, PD]], C.dwl, C.dwlLine);
+
+  plot.curve(D, C.demand, { width: 2.4, to: st.a / st.b });
+  plot.curve(S, C.supply, { width: 2.4 });
+
+  plot.seg(Qeq, 0, Qeq, Peq, C.muted, { dash: [3, 3], width: 1 });
+  plot.seg(0, Peq, Qeq, Peq, C.muted, { dash: [3, 3], width: 1 });
+  plot.dot(Qeq, Peq, C.muted);
+  plot.tickP(Peq, "P*", C.muted);
+  plot.tickQ(Qeq, "Q*", C.muted);
+
+  plot.seg(Q1, 0, Q1, PS, C.muted, { dash: [4, 3], width: 1 });
+  plot.seg(0, PS, Q1, PS, C.muted, { dash: [4, 3], width: 1 });
+  plot.seg(0, PD, Q1, PD, C.muted, { dash: [4, 3], width: 1 });
+  plot.tickP(PS, "P_S", C.txt);
+  plot.tickP(PD, "P_D", C.txt);
+  plot.tickQ(Q1, "Q′", C.txt);
+  plot.dot(Q1, PS, C.txt);
+  plot.dot(Q1, PD, C.txt);
+  if (sub > 0.01) plot.spanV(PD, PS, Q1, "Subsidio " + fmt.n(sub), C.policy);
+
+  plot.label(maxQ * 0.86, Math.max(D(maxQ * 0.86), 0), "Demanda", C.demand, { dx: 4, dy: 13, align: "right", box: true });
+  plot.label(maxQ * 0.86, S(maxQ * 0.86), "Oferta", C.supply, { dx: 4, dy: -6, align: "right", box: true });
+
+  // numeros
+  const EC0 = 0.5 * (st.a - Peq) * Qeq, EP0 = 0.5 * (Peq - st.c) * Qeq;
+  const EC1 = 0.5 * (st.a - PD) * Q1,   EP1 = 0.5 * (PS - st.c) * Q1;
+  const gasto = sub * Q1;
+  const tot0 = EC0 + EP0, tot1 = EC1 + EP1 - gasto;
+  const dwl = tot0 - tot1;
+
+  const fila = (nom, v0, v1) => {
+    const dif = v1 - v0;
+    return "<tr><td>" + nom + "</td><td>" + fmt.n(v0) + "</td><td>" + fmt.n(v1) + "</td>" +
+      '<td class="' + (dif > 0.005 ? "pos" : dif < -0.005 ? "neg" : "") + '">' +
+      (dif > 0.005 ? "+" : "") + fmt.n(dif) + "</td></tr>";
+  };
+  document.querySelector("#tabla tbody").innerHTML =
+    fila("Excedente del consumidor", EC0, EC1) +
+    fila("Excedente del productor", EP0, EP1) +
+    fila("Gasto fiscal", 0, -gasto) +
+    fila("Excedente total", tot0, tot1);
+
+  document.getElementById("m-q").textContent     = fmt.n(Q1);
+  document.getElementById("m-ps").textContent    = fmt.n(PS);
+  document.getElementById("m-pd").textContent    = fmt.n(PD);
+  document.getElementById("m-gasto").textContent = fmt.n(gasto);
+  document.getElementById("m-dwl").textContent   = fmt.n(dwl);
+  document.getElementById("m-dq").textContent    = fmt.n(Q1 - Qeq);
+
+  document.getElementById("note").textContent = sub < 0.01
+    ? "Sin subsidio el mercado está en su equilibrio y el excedente total es máximo. Sube s para abrir la cuña."
+    : "Consumidores y productores ganan los dos: el comprador paga menos (" + fmt.n(PD) + " en vez de " + fmt.n(Peq) +
+      ") y el vendedor recibe más (" + fmt.n(PS) + "). Pero el Estado gasta " + fmt.n(gasto) +
+      ", más que la suma de esas dos ganancias, porque se producen " + fmt.n(Q1 - Qeq) +
+      " unidades cuyo costo supera lo que los compradores valoran. Por eso el excedente total cae en " + fmt.n(dwl) + ".";
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+initTools({ state, defaults, layers, layerDefaults, format, render,
+            canvas: "c-main", file: "m15-subsidio" });
+</script>
+</body>
+</html>

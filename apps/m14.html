@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tamaño del impuesto y curva de Laffer — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Tama&ntilde;o del impuesto, p&eacute;rdida social y curva de Laffer</h1>
+  <span>M14 &middot; Pol&iacute;ticas p&uacute;blicas</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tool-btn" data-preset="peq">Impuesto peque&ntilde;o</button>
+    <button class="tool-btn" data-preset="med">Impuesto mediano</button>
+    <button class="tool-btn" data-preset="gra">Impuesto grande</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" data-preset="inel">Curvas inel&aacute;sticas</button>
+    <button class="tool-btn" data-preset="elas">Curvas el&aacute;sticas</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Mercado</div>
+      <canvas id="c-main"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Bienestar seg&uacute;n el tama&ntilde;o del impuesto</div>
+      <canvas id="c-traj"></canvas>
+    </div>
+  </div>
+
+  <div class="panel-note" id="note" style="padding:0 4px"></div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-cs-line)" stroke-width="2.5"/></svg>Excedente del consumidor</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-ps-line)" stroke-width="2.5"/></svg>Excedente del productor</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-fiscal-line)" stroke-width="2.5"/></svg>Recaudaci&oacute;n fiscal &mdash; curva de Laffer</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-dwl-line)" stroke-width="2.5"/></svg>P&eacute;rdida social</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Impuesto</div>
+        <div class="sr"><div class="sh"><span class="sn">Impuesto por unidad (t)</span><span class="sv" id="v-t">4.0</span></div>
+          <input type="range" data-p="t" min="0" max="18" step="0.25" value="4"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Demanda &nbsp;P = a &minus; b&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (b)</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Oferta &nbsp;P = c + d&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (d)</span><span class="sv" id="v-d">1.0</span></div>
+          <input type="range" data-p="d" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Con el impuesto actual</div>
+      <div class="metric"><div class="ml">Cantidad Q&prime;</div><div class="mv" id="m-q">&mdash;</div></div>
+      <div class="metric"><div class="ml">Recaudaci&oacute;n</div><div class="mv" id="m-rec">&mdash;</div></div>
+      <div class="metric"><div class="ml">P&eacute;rdida social</div><div class="mv" id="m-dwl">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Referencias</div>
+      <div class="metric"><div class="ml">t que maximiza la recaudaci&oacute;n</div><div class="mv" id="m-tmax">&mdash;</div></div>
+      <div class="metric"><div class="ml">Recaudaci&oacute;n m&aacute;xima</div><div class="mv" id="m-recmax">&mdash;</div></div>
+      <div class="metric"><div class="ml">t prohibitivo (mercado desaparece)</div><div class="mv" id="m-tpro">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindPresets, initTools } = ICS;
+
+// a y c fijos: el foco esta en el tamano del impuesto y en las pendientes
+const defaults = { t: 4, b: 1, d: 1, a: 20, c: 2 };
+const state    = Object.assign({}, defaults);
+
+const presets = {
+  peq:  { t: 2 },  med: { t: 6 },  gra: { t: 13 },
+  inel: { b: 2.5, d: 2.5, t: 4 },
+  elas: { b: 0.4, d: 0.4, t: 4 }
+};
+
+const format = { t: v => v.toFixed(2), b: v => v.toFixed(1), d: v => v.toFixed(1) };
+
+const plot  = new Plot("c-main", { height: 340 });
+const traj  = new Plot("c-traj", { height: 340 });
+
+function render() {
+  const s = state;
+  const D = q => s.a - s.b * q;
+  const S = q => s.c + s.d * q;
+  const bd = s.b + s.d;
+  const Qeq = (s.a - s.c) / bd;
+  const Peq = D(Qeq);
+
+  const tPro = s.a - s.c;                    // con este impuesto ya no se transa nada
+  const t    = Math.min(s.t, tPro);
+  const Qt   = tt => Math.max(0, (s.a - s.c - tt) / bd);
+  const Q1   = Qt(t);
+  const PD   = s.a - s.b * Q1, PS = PD - t;
+
+  const rec  = tt => tt * Qt(tt);
+  const dwl  = tt => 0.5 * tt * (Qeq - Qt(tt));
+  const ec   = tt => 0.5 * s.b * Qt(tt) * Qt(tt);
+  const ep   = tt => 0.5 * s.d * Qt(tt) * Qt(tt);
+
+  const tEstrella = tPro / 2;
+  const recMax    = rec(tEstrella);
+
+  /* ---- panel del mercado ---- */
+  const maxQ = Qeq * 2.1, maxP = s.a * 1.12;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad", "Precio", { skipP: [PD, PS, Peq], skipQ: [Q1, Qeq] });
+
+  plot.rect(0, PS, Q1, PD, C.fiscal, C.fiscalLine);
+  plot.area([[Q1, PD], [Qeq, Peq], [Q1, PS]], C.dwl, C.dwlLine);
+
+  plot.curve(D, C.demand, { width: 2.4, to: s.a / s.b });
+  plot.curve(S, C.supply, { width: 2.4 });
+
+  plot.seg(Qeq, 0, Qeq, Peq, C.muted, { dash: [3, 3], width: 1 });
+  plot.seg(Q1, 0, Q1, PD, C.muted, { dash: [4, 3], width: 1 });
+  plot.dot(Qeq, Peq, C.muted);
+  plot.tickP(PD, "P_D", C.txt);
+  plot.tickP(PS, "P_S", C.txt);
+  plot.tickQ(Q1, "Q′", C.txt);
+  plot.tickQ(Qeq, "Q*", C.muted);
+  if (Q1 > 0.2)
+    plot.label(Q1 * 0.45, (PS + PD) / 2, "Recaudación", C.fiscalLine, { align: "center", bold: true });
+  plot.label(maxQ * 0.86, Math.max(D(maxQ * 0.86), 0), "Demanda", C.demand, { dx: 4, dy: 13, align: "right", box: true });
+  plot.label(maxQ * 0.86, S(maxQ * 0.86), "Oferta", C.supply, { dx: 4, dy: -6, align: "right", box: true });
+
+  /* ---- panel de trayectorias ---- */
+  const ETmax = 0.5 * bd * Qeq * Qeq;
+  const maxY  = ETmax * 1.15;
+  traj.begin(tPro * 1.02, maxY).grid()
+      .axes("Tamaño del impuesto (t)", "Monto", { skipQ: [t, tEstrella] });
+
+  traj.curve(ec,  C.csLine,     { width: 2.2, to: tPro });
+  traj.curve(ep,  C.psLine,     { width: 2.2, to: tPro });
+  traj.curve(dwl, C.dwlLine,    { width: 2.4, to: tPro });
+  traj.curve(rec, C.fiscalLine, { width: 2.4, to: tPro });
+
+  // el maximo de la curva de Laffer
+  traj.seg(tEstrella, 0, tEstrella, recMax, C.muted, { dash: [4, 3], width: 1 });
+  traj.dot(tEstrella, recMax, C.fiscalLine);
+  traj.tickQ(tEstrella, "t*", C.muted);
+  traj.label(tEstrella, recMax, "máxima recaudación", C.fiscalLine,
+    { dx: 6, dy: -8, box: true });
+
+  // donde estamos ahora
+  traj.seg(t, 0, t, maxY * 0.97, C.policy, { width: 1.6 });
+  traj.tickQ(t, "t", C.policy);
+  [[ec, C.csLine], [ep, C.psLine], [rec, C.fiscalLine], [dwl, C.dwlLine]]
+    .forEach(([f, col]) => traj.dot(t, f(t), col));
+
+  traj.label(tPro * 0.62, dwl(tPro * 0.62), "Pérdida social", C.dwlLine, { dx: 5, dy: -7, box: true });
+  traj.label(tEstrella * 0.55, rec(tEstrella * 0.55), "Laffer", C.fiscalLine, { dx: 5, dy: 14, box: true });
+
+  /* ---- numeros ---- */
+  document.getElementById("m-q").textContent      = fmt.n(Q1);
+  document.getElementById("m-rec").textContent    = fmt.n(rec(t));
+  document.getElementById("m-dwl").textContent    = fmt.n(dwl(t));
+  document.getElementById("m-tmax").textContent   = fmt.n(tEstrella);
+  document.getElementById("m-recmax").textContent = fmt.n(recMax);
+  document.getElementById("m-tpro").textContent   = fmt.n(tPro);
+
+  const nota = document.getElementById("note");
+  if (t < 0.01) {
+    nota.textContent = "Sin impuesto no hay ni recaudación ni pérdida social. Mueve t y observa las dos curvas: " +
+      "la recaudación sube y después baja, la pérdida social solo sube, y cada vez más rápido.";
+  } else if (t < tEstrella) {
+    nota.textContent =
+      "Estamos en el tramo creciente de la curva de Laffer: subir el impuesto todavía recauda más (" + fmt.n(rec(t)) +
+      "). Pero la pérdida social crece de manera cuadrática —va en " + fmt.n(dwl(t)) +
+      "— porque depende del área de un triángulo cuyos dos lados aumentan con t.";
+  } else {
+    nota.textContent =
+      "Pasamos t* = " + fmt.n(tEstrella) + ": de aquí en adelante subir el impuesto recauda MENOS, porque el mercado se contrae " +
+      "más rápido de lo que crece la tasa. La recaudación va en " + fmt.n(rec(t)) + " y la pérdida social ya suma " +
+      fmt.n(dwl(t)) + ". Ese es el argumento de la curva de Laffer.";
+  }
+}
+
+bindSliders(state, render, format);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m14-laffer" });
+</script>
+</body>
+</html>

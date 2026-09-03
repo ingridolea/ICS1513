@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EP continuo y su variación — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Excedente del productor continuo y su variaci&oacute;n</h1>
+  <span>M6 &middot; Eficiencia de mercado</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="nivel">Excedente a un precio</button>
+    <button class="tab" data-tab="cambio">Variaci&oacute;n entre dos precios</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">&Aacute;rea bajo el precio y sobre la curva de oferta</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Curva de oferta</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-ps)"></span>Excedente del productor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-transfer)"></span>R &mdash; ganancia por mayor precio</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-fiscal)"></span>T &mdash; ganancia por m&aacute;s comercio</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders">
+      <div class="slider-group">
+        <div class="group-label">Precios</div>
+        <div class="sr"><div class="sh"><span class="sn">Precio inicial p&prime;</span><span class="sv" id="v-p1">6.0</span></div>
+          <input type="range" data-p="p1" min="0.5" max="18" step="0.5" value="6"></div>
+        <div class="sr" id="sr-p2"><div class="sh"><span class="sn">Precio final p&Prime;</span><span class="sv" id="v-p2">12.0</span></div>
+          <input type="range" data-p="p2" min="0.5" max="18" step="0.5" value="12"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Oferta &nbsp;P = c + d&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (c)</span><span class="sv" id="v-c">2</span></div>
+          <input type="range" data-p="c" min="0" max="10" step="1" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (d)</span><span class="sv" id="v-d">1.0</span></div>
+          <input type="range" data-p="d" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row" id="mrow"></div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindTabs, initTools } = ICS;
+
+const defaults = { p1: 6, p2: 12, c: 2, d: 1, tab: "nivel" };
+const state    = Object.assign({}, defaults);
+
+const format = { p1: v => v.toFixed(1), p2: v => v.toFixed(1),
+                 c: v => v.toFixed(0), d: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 380 });
+
+function render() {
+  const s = state;
+  const S = q => s.c + s.d * q;
+  const Q = p => Math.max(0, (p - s.c) / s.d);
+  const nivel = s.tab === "nivel";
+
+  document.getElementById("sr-p2").style.display = nivel ? "none" : "";
+  document.getElementById("ptitle").textContent = nivel
+    ? "Área bajo el precio y sobre la curva de oferta"
+    : "El precio sube de p′ a p″";
+
+  const pLo = nivel ? s.p1 : Math.min(s.p1, s.p2);
+  const pHi = nivel ? s.p1 : Math.max(s.p1, s.p2);
+  const x1 = Q(pLo), x2 = Q(pHi);
+
+  const maxP = 20 * 1.1;
+  const maxQ = Math.max(Q(maxP), 1) * 1.02;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad", "Precio", { skipP: [pLo, pHi], skipQ: [x1, x2] });
+
+  if (nivel) {
+    plot.area([[0, s.c], [x1, pLo], [0, pLo]], C.ps, C.psLine);
+    plot.label(x1 * 0.3, (s.c + pLo) / 2, "EP", C.psLine, { bold: true, align: "center" });
+  } else {
+    // el excedente que ya tenia, mas las dos ganancias
+    plot.area([[0, s.c], [x1, pLo], [0, pLo]], C.ps, C.psLine);
+    plot.rect(0, pLo, x1, pHi, C.transfer, C.muted);
+    plot.area([[x1, pLo], [x2, pHi], [x1, pHi]], C.fiscal, C.fiscalLine);
+    if (x1 > 0) plot.label(x1 / 2, (pLo + pHi) / 2, "R", C.txt, { bold: true, align: "center" });
+    if (x2 > x1) plot.label(x1 + (x2 - x1) * 0.45, pLo + (pHi - pLo) * 0.62, "T", C.fiscalLine,
+      { bold: true, align: "center" });
+  }
+
+  plot.curve(S, C.supply, { width: 2.4 });
+
+  plot.seg(0, pLo, x1, pLo, C.muted, { dash: [4, 3], width: 1 });
+  plot.seg(x1, 0, x1, pLo, C.muted, { dash: [4, 3], width: 1 });
+  plot.tickP(pLo, nivel ? "P*" : "p′", C.txt);
+  plot.tickQ(x1, nivel ? "Q*" : "x′", C.txt);
+  if (!nivel) {
+    plot.seg(0, pHi, x2, pHi, C.muted, { dash: [4, 3], width: 1 });
+    plot.seg(x2, 0, x2, pHi, C.muted, { dash: [4, 3], width: 1 });
+    plot.tickP(pHi, "p″", C.txt);
+    plot.tickQ(x2, "x″", C.txt);
+    plot.spanV(pLo, pHi, maxQ * 0.97, "", C.policy);
+  }
+  plot.label(maxQ * 0.72, S(maxQ * 0.72), "Oferta", C.supply, { dx: 6, dy: 14, box: true });
+
+  const EP1 = 0.5 * (pLo - s.c) * x1;
+  const EP2 = 0.5 * (pHi - s.c) * x2;
+  const R = (pHi - pLo) * x1;
+  const T = 0.5 * (pHi - pLo) * (x2 - x1);
+
+  const mrow = document.getElementById("mrow");
+  if (nivel) {
+    mrow.className = "metrics-row";
+    mrow.innerHTML =
+      '<div class="mgroup"><div class="mgroup-label">Excedente del productor</div>' +
+      '<div class="metric"><div class="ml">EP a P*</div><div class="mv">' + fmt.n(EP1) + '</div></div>' +
+      '<div class="metric"><div class="ml">Cantidad ofrecida</div><div class="mv">' + fmt.n(x1) + '</div></div></div>' +
+      '<div class="mgroup"><div class="mgroup-label">Ingreso y costo</div>' +
+      '<div class="metric"><div class="ml">Ingreso P*·Q*</div><div class="mv">' + fmt.n(pLo * x1) + '</div></div>' +
+      '<div class="metric"><div class="ml">Costo total</div><div class="mv">' + fmt.n(pLo * x1 - EP1) + '</div></div></div>';
+    document.getElementById("algebra").innerHTML =
+      '<div class="step">Q(P*) = (P* − c)/d = (' + fmt.n(pLo,1) + ' − ' + s.c + ')/' + fmt.n(s.d,1) +
+        ' = <span class="res">' + fmt.n(x1) + '</span></div>' +
+      '<div class="step">EP = 1/2 · (P* − c) · Q* = 1/2 · ' + fmt.n(pLo - s.c) + ' · ' + fmt.n(x1) +
+        ' = <span class="res">' + fmt.n(EP1) + '</span></div>';
+    document.getElementById("note").textContent =
+      "El excedente del productor es el área entre el precio y la curva de oferta: a cada unidad, la diferencia entre lo que " +
+      "el vendedor recibe y lo que le cuesta producirla. Los vendedores con costo sobre P* simplemente no venden.";
+  } else {
+    mrow.className = "metrics-row";
+    mrow.innerHTML =
+      '<div class="mgroup three"><div class="mgroup-label">Ganancia del productor</div>' +
+      '<div class="metric"><div class="ml">Rectángulo R</div><div class="mv">' + fmt.n(R) + '</div></div>' +
+      '<div class="metric"><div class="ml">Triángulo T</div><div class="mv">' + fmt.n(T) + '</div></div>' +
+      '<div class="metric"><div class="ml">Ganancia total</div><div class="mv">' + fmt.n(R + T) + '</div></div></div>' +
+      '<div class="mgroup three"><div class="mgroup-label">Excedente del productor</div>' +
+      '<div class="metric"><div class="ml">EP a p′</div><div class="mv">' + fmt.n(EP1) + '</div></div>' +
+      '<div class="metric"><div class="ml">EP a p″</div><div class="mv">' + fmt.n(EP2) + '</div></div>' +
+      '<div class="metric"><div class="ml">Unidades nuevas</div><div class="mv">' + fmt.n(x2 - x1) + '</div></div></div>';
+    document.getElementById("algebra").innerHTML =
+      '<div class="step">R = (p″ − p′) · x′ = ' + fmt.n(pHi - pLo) + ' · ' + fmt.n(x1) +
+        ' = <span class="res">' + fmt.n(R) + '</span></div>' +
+      '<div class="step">T = 1/2 · (p″ − p′) · (x″ − x′) = 1/2 · ' + fmt.n(pHi - pLo) + ' · ' +
+        fmt.n(x2 - x1) + ' = <span class="res">' + fmt.n(T) + '</span></div>' +
+      '<div class="step">ΔEP = R + T = <span class="res">' + fmt.n(R + T) + '</span>' +
+        '   (comprobación: EP(p″) − EP(p′) = ' + fmt.n(EP2 - EP1) + ')</div>';
+    document.getElementById("note").textContent =
+      "R es lo que gana de más por las x′ unidades que ya vendía. T es la ganancia sobre las " + fmt.n(x2 - x1) +
+      " unidades nuevas que ahora le conviene producir. Es el espejo exacto de la pérdida del consumidor en M3.";
+  }
+}
+
+bindSliders(state, render, format);
+bindTabs(state, "tab", render);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m06-variacion-ep" });
+</script>
+</body>
+</html>

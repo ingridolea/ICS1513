@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>¿Por qué el equilibrio es eficiente? — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>&iquest;Por qu&eacute; el equilibrio es eficiente?</h1>
+  <span>M8 &middot; Eficiencia de mercado</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tool-btn" data-preset="poco">Producir de menos</button>
+    <button class="tool-btn" data-preset="justo">Cantidad de equilibrio</button>
+    <button class="tool-btn" data-preset="mucho">Producir de m&aacute;s</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Mercado</div>
+      <canvas id="c-main"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Excedente total seg&uacute;n la cantidad producida</div>
+      <canvas id="c-et"></canvas>
+    </div>
+  </div>
+
+  <div class="panel-note" id="note" style="padding:0 4px"></div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Demanda &mdash; valor para el comprador</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Oferta &mdash; costo del vendedor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-total)"></span>Ganancias del comercio realizadas</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-dwl)"></span>P&eacute;rdida respecto del m&aacute;ximo</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Cantidad producida</div>
+        <div class="sr"><div class="sh"><span class="sn">Q &mdash; mu&eacute;vela lejos de Q*</span><span class="sv" id="v-q">9.0</span></div>
+          <input type="range" data-p="q" min="0" max="20" step="0.25" value="9"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Demanda &nbsp;P = a &minus; b&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (a)</span><span class="sv" id="v-a">20</span></div>
+          <input type="range" data-p="a" min="10" max="40" step="1" value="20"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (b)</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Oferta &nbsp;P = c + d&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (c)</span><span class="sv" id="v-c">2</span></div>
+          <input type="range" data-p="c" min="0" max="15" step="1" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (d)</span><span class="sv" id="v-d">1.0</span></div>
+          <input type="range" data-p="d" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Cantidades</div>
+      <div class="metric"><div class="ml">Q elegida</div><div class="mv" id="m-q">&mdash;</div></div>
+      <div class="metric"><div class="ml">Q* de equilibrio</div><div class="mv" id="m-qeq">&mdash;</div></div>
+      <div class="metric"><div class="ml">Diferencia</div><div class="mv" id="m-dq">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Excedente total</div>
+      <div class="metric"><div class="ml">Con Q elegida</div><div class="mv" id="m-et">&mdash;</div></div>
+      <div class="metric"><div class="ml">M&aacute;ximo posible</div><div class="mv" id="m-etmax">&mdash;</div></div>
+      <div class="metric"><div class="ml">P&eacute;rdida</div><div class="mv" id="m-dwl">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindPresets, initTools } = ICS;
+
+const defaults = { q: 9, a: 20, b: 1, c: 2, d: 1 };
+const state    = Object.assign({}, defaults);
+
+const presets = { poco: { q: 4 }, justo: { q: 9 }, mucho: { q: 14 } };
+
+const format = { q: v => v.toFixed(2), a: v => v.toFixed(0), b: v => v.toFixed(1),
+                 c: v => v.toFixed(0), d: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 330 });
+const plotET = new Plot("c-et", { height: 330, pad: { l: 52, r: 22, t: 28, b: 42 } });
+
+function render() {
+  const s = state;
+  const D = q => s.a - s.b * q;
+  const S = q => s.c + s.d * q;
+  const Qeq = (s.a - s.c) / (s.b + s.d);
+  const Peq = D(Qeq);
+
+  // no tiene sentido producir mas alla de donde la demanda llega a cero
+  const Qtope = s.a / s.b;
+  const Q = Math.max(0, Math.min(s.q, Qtope));
+
+  // excedente total: area entre demanda y oferta hasta Q
+  const ET    = q => (s.a - s.c) * q - (s.b + s.d) * q * q / 2;
+  const ETmax = ET(Qeq);
+  const dwl   = ETmax - ET(Q);
+
+  /* ---- panel del mercado ---- */
+  const maxQ = Math.max(Qeq * 2.2, Q * 1.15), maxP = s.a * 1.15;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad", "Precio", { skipQ: [Q, Qeq], skipP: [Peq] });
+
+  // ganancias del comercio efectivamente realizadas
+  if (Q > 0)
+    plot.area([[0, s.a], [Q, D(Q)], [Q, S(Q)], [0, s.c]], C.total, C.totalLine);
+
+  // triangulo de perdida, a un lado u otro de Q*
+  if (Math.abs(Q - Qeq) > 1e-9)
+    plot.area([[Q, D(Q)], [Qeq, Peq], [Q, S(Q)]], C.dwl, C.dwlLine);
+
+  plot.seg(Qeq, 0, Qeq, Peq, C.muted, { dash: [4, 3], width: 1 });
+  plot.seg(Q, 0, Q, Math.max(D(Q), S(Q)), C.policy, { width: 1.8 });
+
+  plot.curve(D, C.demand, { width: 2.4, to: Qtope });
+  plot.curve(S, C.supply, { width: 2.4 });
+
+  plot.dot(Qeq, Peq, C.txt);
+  plot.tickQ(Qeq, "Q*", C.txt);
+  plot.tickQ(Q, "Q", C.policy);
+  plot.label(maxQ * 0.88, Math.max(D(maxQ * 0.88), 0), "Demanda", C.demand, { dx: 4, dy: 13, box: true });
+  plot.label(maxQ * 0.88, S(maxQ * 0.88), "Oferta", C.supply, { dx: 4, dy: -6, box: true });
+
+  /* ---- panel del excedente total ---- */
+  const maxET = ETmax * 1.18;
+  plotET.begin(maxQ, maxET).grid()
+        .axes("Cantidad producida", "Excedente total", { skipQ: [Q, Qeq] });
+  plotET.curve(q => Math.max(ET(q), 0), C.totalLine, { width: 2.4, to: Qtope });
+  plotET.seg(Qeq, 0, Qeq, ETmax, C.muted, { dash: [4, 3], width: 1 });
+  plotET.seg(0, ETmax, Qeq, ETmax, C.muted, { dash: [4, 3], width: 1 });
+  plotET.dot(Qeq, ETmax, C.txt);
+  plotET.tickQ(Qeq, "Q*", C.txt);
+
+  plotET.seg(Q, 0, Q, Math.max(ET(Q), 0), C.policy, { width: 1.8 });
+  plotET.dot(Q, Math.max(ET(Q), 0), C.policy);
+  plotET.tickQ(Q, "Q", C.policy);
+  if (dwl > 0.01)
+    plotET.spanV(Math.max(ET(Q), 0), ETmax, Q, "pérdida " + fmt.n(dwl), C.dwlLine);
+
+  /* ---- numeros ---- */
+  document.getElementById("m-q").textContent     = fmt.n(Q);
+  document.getElementById("m-qeq").textContent   = fmt.n(Qeq);
+  document.getElementById("m-dq").textContent    = (Q > Qeq ? "+" : "") + fmt.n(Q - Qeq);
+  document.getElementById("m-et").textContent    = fmt.n(ET(Q));
+  document.getElementById("m-etmax").textContent = fmt.n(ETmax);
+  document.getElementById("m-dwl").textContent   = fmt.n(dwl);
+
+  const nota = document.getElementById("note");
+  if (Math.abs(Q - Qeq) < 0.01) {
+    nota.textContent =
+      "En Q* el excedente total llega a su máximo (" + fmt.n(ETmax) + "). La última unidad transada es justo aquella en que " +
+      "la disposición a pagar del comprador iguala el costo del vendedor: ya no quedan intercambios que convengan a ambas partes.";
+  } else if (Q < Qeq) {
+    nota.textContent =
+      "Con Q = " + fmt.n(Q) + " se dejan de hacer " + fmt.n(Qeq - Q) + " unidades de intercambio en las que el comprador valora el bien " +
+      "más de lo que le cuesta al vendedor producirlo. Ese valor no realizado es el triángulo rojo: " + fmt.n(dwl) + ".";
+  } else {
+    nota.textContent =
+      "Con Q = " + fmt.n(Q) + " se producen " + fmt.n(Q - Qeq) + " unidades de más, en las que el costo del vendedor supera lo que el " +
+      "comprador está dispuesto a pagar. Cada una de esas unidades resta bienestar: el triángulo rojo suma " + fmt.n(dwl) + ".";
+  }
+}
+
+bindSliders(state, render, format);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m08-eficiencia-equilibrio" });
+</script>
+</body>
+</html>

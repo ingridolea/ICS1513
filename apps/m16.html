@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ejercicio propuesto no lineal — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Ejercicio propuesto: oferta y demanda no lineales</h1>
+  <span>M16 &middot; Pol&iacute;ticas p&uacute;blicas</span>
+</header>
+
+<div class="app">
+
+  <div class="algebra" style="line-height:2.2">
+    <div class="step">Q_S(P_S) = √(10·P_S) − 1        Q_D(P_D) = (100 − P_D) / P_D</div>
+    <div class="step">a) Punto de equilibrio.   b) Excedente total, desglosado en EP y EC.</div>
+    <div class="step">c) ¿Cómo se reparte la carga de un impuesto t?   d) Equilibrio con t = 5.   e) Excedentes, recaudación y pérdida social.</div>
+  </div>
+
+  <div class="top-bar">
+    <button class="tool-btn" data-preset="sin">Sin impuesto</button>
+    <button class="tool-btn" data-preset="con">Con t = 5</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-sol">Mostrar soluci&oacute;n</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Mercado</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Demanda &nbsp;P<sub>D</sub>(Q) = 100/(1+Q)</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Oferta &nbsp;P<sub>S</sub>(Q) = (1+Q)&sup2;/10</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-cs)"></span>Excedente consumidor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-ps)"></span>Excedente productor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-fiscal)"></span>Recaudaci&oacute;n</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-dwl)"></span>P&eacute;rdida social</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders">
+      <div class="slider-group wide">
+        <div class="group-label">Impuesto</div>
+        <div class="sr"><div class="sh"><span class="sn">Impuesto por unidad (t)</span><span class="sv" id="v-t">5.0</span></div>
+          <input type="range" data-p="t" min="0" max="40" step="0.5" value="5"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Equilibrio</div>
+      <div class="metric"><div class="ml">Cantidad Q</div><div class="mv" id="m-q">&mdash;</div></div>
+      <div class="metric"><div class="ml">Paga el comprador P<sub>D</sub></div><div class="mv" id="m-pd">&mdash;</div></div>
+      <div class="metric"><div class="ml">Recibe el vendedor P<sub>S</sub></div><div class="mv" id="m-ps">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Bienestar</div>
+      <div class="metric"><div class="ml">Excedente consumidor</div><div class="mv" id="m-ec">&mdash;</div></div>
+      <div class="metric"><div class="ml">Excedente productor</div><div class="mv" id="m-ep">&mdash;</div></div>
+      <div class="metric"><div class="ml">Excedente total</div><div class="mv" id="m-tot">&mdash;</div></div>
+    </div>
+  </div>
+
+  <div class="metrics-row one">
+    <div class="mgroup three">
+      <div class="mgroup-label">Con impuesto</div>
+      <div class="metric"><div class="ml">Recaudaci&oacute;n t&middot;Q</div><div class="mv" id="m-rec">&mdash;</div></div>
+      <div class="metric"><div class="ml">P&eacute;rdida social</div><div class="mv" id="m-dwl">&mdash;</div></div>
+      <div class="metric"><div class="ml">Carga: comprador / vendedor</div><div class="mv" id="m-carga">&mdash;</div></div>
+    </div>
+  </div>
+
+  <div class="algebra" id="solucion" style="display:none"></div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindPresets, initTools } = ICS;
+
+const defaults = { t: 5 };
+const state    = Object.assign({}, defaults);
+const presets  = { sin: { t: 0 }, con: { t: 5 } };
+const format   = { t: v => v.toFixed(1) };
+
+let verSolucion = false;
+
+// Las funciones del enunciado, escritas como precio en funcion de la cantidad:
+//   Q_D = (100 − P_D)/P_D   ⇒  P_D(Q) = 100/(1+Q)
+//   Q_S = √(10·P_S) − 1     ⇒  P_S(Q) = (1+Q)²/10
+const PD = q => 100 / (1 + q);
+const PS = q => Math.pow(1 + q, 2) / 10;
+
+// Primitivas exactas, para no depender de integracion numerica
+const intPD = q => 100 * Math.log(1 + q);                  // ∫ P_D dq
+const intPS = q => (Math.pow(1 + q, 3) - 1) / 30;          // ∫ P_S dq
+
+// Q tal que P_D(Q) − P_S(Q) = t, por biseccion
+function cantidad(t) {
+  const f = q => PD(q) - PS(q) - t;
+  if (f(0) <= 0) return 0;                                 // impuesto prohibitivo
+  let lo = 0, hi = 9;
+  while (f(hi) > 0) hi *= 2;
+  for (let i = 0; i < 80; i++) {
+    const m = (lo + hi) / 2;
+    if (f(m) > 0) lo = m; else hi = m;
+  }
+  return (lo + hi) / 2;
+}
+
+const plot = new Plot("c-main", { height: 400 });
+
+// equilibrio sin impuesto: 100/(1+Q) = (1+Q)²/10 ⇒ (1+Q)³ = 1000 ⇒ Q = 9
+const Q0 = 9, P0 = 10;
+const EC0 = intPD(Q0) - P0 * Q0;
+const EP0 = P0 * Q0 - intPS(Q0);
+
+function render() {
+  const t = state.t;
+  const Q = cantidad(t);
+  const pd = Q > 0 ? PD(Q) : PD(0);
+  const ps = Q > 0 ? PS(Q) : PS(0);
+
+  const EC = intPD(Q) - pd * Q;
+  const EP = ps * Q - intPS(Q);
+  const rec = t * Q;
+  const tot = EC + EP + rec;
+  const dwl = (EC0 + EP0) - tot;
+
+  document.getElementById("ptitle").textContent = t < 0.01
+    ? "Mercado sin impuesto" : "Mercado con impuesto de t = " + fmt.n(t, 1);
+
+  const maxQ = 14, maxP = 34;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad (Q)", "Precio (P)", { skipP: [pd, ps, P0], skipQ: [Q, Q0] });
+
+  // areas de excedente hasta la cantidad transada
+  const pasos = 90;
+  const areaCurva = (fn, base) => {
+    const pts = [];
+    for (let i = 0; i <= pasos; i++) pts.push([Q * i / pasos, fn(Q * i / pasos)]);
+    pts.push([Q, base], [0, base]);
+    return pts;
+  };
+  if (Q > 0) {
+    plot.area(areaCurva(PD, pd), C.cs, C.csLine);
+    plot.area(areaCurva(PS, ps), C.ps, C.psLine);
+    if (t > 0.01) plot.rect(0, ps, Q, pd, C.fiscal, C.fiscalLine);
+  }
+
+  // perdida social: entre ambas curvas, de Q a Q0
+  if (t > 0.01 && Q < Q0) {
+    const pts = [];
+    for (let i = 0; i <= pasos; i++) { const q = Q + (Q0 - Q) * i / pasos; pts.push([q, PD(q)]); }
+    for (let i = pasos; i >= 0; i--) { const q = Q + (Q0 - Q) * i / pasos; pts.push([q, PS(q)]); }
+    plot.area(pts, C.dwl, C.dwlLine);
+  }
+
+  plot.curve(PD, C.demand, { width: 2.4, from: 0.001 });
+  plot.curve(PS, C.supply, { width: 2.4 });
+
+  plot.seg(Q0, 0, Q0, P0, C.muted, { dash: [3, 3], width: 1 });
+  plot.seg(0, P0, Q0, P0, C.muted, { dash: [3, 3], width: 1 });
+  plot.dot(Q0, P0, C.muted);
+  plot.tickP(P0, "P* = 10", C.muted);
+  plot.tickQ(Q0, "Q* = 9", C.muted);
+
+  if (t > 0.01) {
+    plot.seg(Q, 0, Q, pd, C.muted, { dash: [4, 3], width: 1 });
+    plot.seg(0, pd, Q, pd, C.muted, { dash: [4, 3], width: 1 });
+    plot.seg(0, ps, Q, ps, C.muted, { dash: [4, 3], width: 1 });
+    plot.tickP(pd, "P_D", C.txt);
+    plot.tickP(ps, "P_S", C.txt);
+    plot.tickQ(Q, "Q′", C.txt);
+    plot.dot(Q, pd, C.txt);
+    plot.dot(Q, ps, C.txt);
+    plot.spanV(ps, pd, Q, "t = " + fmt.n(t, 1), C.policy);
+  }
+
+  plot.label(12.5, PD(12.5), "Demanda", C.demand, { dx: 4, dy: -8, align: "right", box: true });
+  plot.label(12.5, PS(12.5), "Oferta", C.supply, { dx: 4, dy: 14, align: "right", box: true });
+
+  const cargaC = t > 0 ? (pd - P0) / t : 0, cargaP = t > 0 ? (P0 - ps) / t : 0;
+  document.getElementById("m-q").textContent   = fmt.n(Q);
+  document.getElementById("m-pd").textContent  = fmt.n(pd);
+  document.getElementById("m-ps").textContent  = fmt.n(ps);
+  document.getElementById("m-ec").textContent  = fmt.n(EC);
+  document.getElementById("m-ep").textContent  = fmt.n(EP);
+  document.getElementById("m-tot").textContent = fmt.n(tot);
+  document.getElementById("m-rec").textContent = fmt.n(rec);
+  document.getElementById("m-dwl").textContent = fmt.n(dwl);
+  document.getElementById("m-carga").textContent = t > 0
+    ? (100 * cargaC).toFixed(0) + "% / " + (100 * cargaP).toFixed(0) + "%" : "—";
+
+  document.getElementById("note").textContent = t < 0.01
+    ? "Con las curvas del enunciado el equilibrio sale redondo: igualando 100/(1+Q) = (1+Q)²/10 queda (1+Q)³ = 1000, " +
+      "es decir Q* = 9 y P* = 10."
+    : "En Q′ = " + fmt.n(Q) + " la brecha vertical entre demanda y oferta es exactamente t. El área azul es lo que recauda el " +
+      "Estado y la roja, entre ambas curvas y entre Q′ y Q*, es la pérdida social.";
+
+  document.getElementById("solucion").innerHTML = !verSolucion ? "" :
+    '<div class="step">a) 100/(1+Q) = (1+Q)²/10  ⇒  (1+Q)³ = 1000  ⇒  <span class="res">Q* = 9,  P* = 10</span></div>' +
+    '<div class="step">b) EC = ∫₀⁹ 100/(1+q) dq − P*·Q* = 100·ln(10) − 90 = <span class="res">' + fmt.n(EC0) + '</span></div>' +
+    '<div class="step">   EP = P*·Q* − ∫₀⁹ (1+q)²/10 dq = 90 − (10³−1)/30 = <span class="res">' + fmt.n(EP0) + '</span></div>' +
+    '<div class="step">   Excedente total = <span class="res">' + fmt.n(EC0 + EP0) + '</span></div>' +
+    '<div class="step">c) Cerca del equilibrio la oferta es la curva más inelástica, así que se espera que los ' +
+      'vendedores carguen con la mayor parte del impuesto.</div>' +
+    '<div class="step">d) Con t = ' + fmt.n(t,1) + ': se resuelve P_D(Q) − P_S(Q) = t  ⇒  ' +
+      '<span class="res">Q′ = ' + fmt.n(Q) + ',  P_D = ' + fmt.n(pd) + ',  P_S = ' + fmt.n(ps) + '</span></div>' +
+    '<div class="step">e) EC = ' + fmt.n(EC) + '   EP = ' + fmt.n(EP) + '   Recaudación = t·Q′ = ' + fmt.n(rec) + '</div>' +
+    '<div class="step">   Excedente total = ' + fmt.n(tot) + '   ⇒  pérdida social = ' + fmt.n(EC0 + EP0) +
+      ' − ' + fmt.n(tot) + ' = <span class="res">' + fmt.n(dwl) + '</span></div>' +
+    '<div class="step">   La carga se reparte ' + (100 * cargaC).toFixed(0) + '% comprador y ' +
+      (100 * cargaP).toFixed(0) + '% vendedor, como anticipaba (c).</div>';
+}
+
+document.getElementById("btn-sol").addEventListener("click", function () {
+  verSolucion = !verSolucion;
+  this.textContent = verSolucion ? "Ocultar solución" : "Mostrar solución";
+  this.classList.toggle("active", verSolucion);
+  document.getElementById("solucion").style.display = verSolucion ? "" : "none";
+  render();
+});
+
+bindSliders(state, render, format);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m16-ejercicio" });
+</script>
+</body>
+</html>

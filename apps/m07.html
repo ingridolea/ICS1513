@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Equilibrio, EC + EP y excedente total — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Equilibrio, EC + EP y excedente total</h1>
+  <span>M7 &middot; Eficiencia de mercado</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="chip" data-layer="cs"><span class="dot" style="background:var(--c-cs-line)"></span>Excedente del consumidor</button>
+    <button class="chip" data-layer="ps"><span class="dot" style="background:var(--c-ps-line)"></span>Excedente del productor</button>
+    <button class="chip" data-layer="notes"><span class="dot" style="background:var(--pu-mid)"></span>Anotaciones</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title">Mercado en equilibrio</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Demanda &nbsp;P = a &minus; b&middot;Q</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Oferta &nbsp;P = c + d&middot;Q</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-cs)"></span>Excedente del consumidor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-ps)"></span>Excedente del productor</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders">
+      <div class="slider-group">
+        <div class="group-label">Demanda &nbsp;P = a &minus; b&middot;Q</div>
+        <div class="sr">
+          <div class="sh"><span class="sn">Intercepto (a) &mdash; disposici&oacute;n a pagar m&aacute;xima</span><span class="sv" id="v-a">20</span></div>
+          <input type="range" data-p="a" min="10" max="40" step="1" value="20">
+        </div>
+        <div class="sr">
+          <div class="sh"><span class="sn">Pendiente (b)</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.3" max="3" step="0.1" value="1">
+        </div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Oferta &nbsp;P = c + d&middot;Q</div>
+        <div class="sr">
+          <div class="sh"><span class="sn">Intercepto (c) &mdash; costo del primer vendedor</span><span class="sv" id="v-c">2</span></div>
+          <input type="range" data-p="c" min="0" max="15" step="1" value="2">
+        </div>
+        <div class="sr">
+          <div class="sh"><span class="sn">Pendiente (d)</span><span class="sv" id="v-d">1.0</span></div>
+          <input type="range" data-p="d" min="0.3" max="3" step="0.1" value="1">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Equilibrio</div>
+      <div class="metric"><div class="ml">Precio P*</div><div class="mv" id="m-p">&mdash;</div></div>
+      <div class="metric"><div class="ml">Cantidad Q*</div><div class="mv" id="m-q">&mdash;</div></div>
+      <div class="metric"><div class="ml">Gasto total P*&middot;Q*</div><div class="mv" id="m-gasto">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Bienestar</div>
+      <div class="metric"><div class="ml">Excedente consumidor</div><div class="mv" id="m-ec">&mdash;</div></div>
+      <div class="metric"><div class="ml">Excedente productor</div><div class="mv" id="m-ep">&mdash;</div></div>
+      <div class="metric"><div class="ml">Excedente total</div><div class="mv" id="m-tot">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, initTools } = ICS;
+
+const defaults = { a: 20, b: 1, c: 2, d: 1 };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { cs: true, ps: true, notes: true };
+const layers        = Object.assign({}, layerDefaults);
+
+const format = {
+  a: v => v.toFixed(0),
+  b: v => v.toFixed(1),
+  c: v => v.toFixed(0),
+  d: v => v.toFixed(1)
+};
+
+const plot = new Plot("c-main", { height: 380 });
+
+function equilibrio(s) {
+  const Q = (s.a - s.c) / (s.b + s.d);
+  return { Q, P: s.a - s.b * Q };
+}
+
+function render() {
+  const s = state;
+  const D = q => s.a - s.b * q;
+  const S = q => s.c + s.d * q;
+  const eq = equilibrio(s);
+
+  const nota = document.getElementById("note");
+  if (eq.Q <= 0) {
+    plot.begin(10, Math.max(s.a, s.c) * 1.15).grid().axes("Cantidad", "Precio");
+    plot.curve(D, C.demand, { width: 2.4 }).curve(S, C.supply, { width: 2.4 });
+    plot.label(5, Math.max(s.a, s.c) * 0.55,
+      "Sin intercambio: el costo del primer vendedor supera la disposición a pagar máxima",
+      C.muted, { align: "center", box: true });
+    nota.textContent = "Con c ≥ a ningún comprador valora el bien más de lo que cuesta producirlo, así que el mercado no se abre.";
+    ["m-p","m-q","m-gasto","m-ec","m-ep","m-tot"].forEach(id =>
+      document.getElementById(id).textContent = "—");
+    document.getElementById("algebra").innerHTML =
+      '<div class="step">No hay equilibrio con intercambio: a = ' + s.a + ' ≤ c = ' + s.c + '</div>';
+    return;
+  }
+
+  const maxQ = eq.Q * 2.2, maxP = s.a * 1.15;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad", "Precio", { skipP: [eq.P], skipQ: [eq.Q] });
+
+  // areas de excedente
+  if (layers.cs) plot.area([[0, s.a], [eq.Q, eq.P], [0, eq.P]], C.cs, C.csLine);
+  if (layers.ps) plot.area([[0, s.c], [eq.Q, eq.P], [0, eq.P]], C.ps, C.psLine);
+
+  // guias al equilibrio
+  plot.guide(eq.Q, eq.P, C.muted, { dotColor: C.txt });
+
+  // curvas
+  plot.curve(D, C.demand, { width: 2.4 });
+  plot.curve(S, C.supply, { width: 2.4 });
+
+  // rotulos de las curvas, como en las diapositivas
+  const qD = maxQ * 0.9, qS = Math.min(maxQ * 0.9, (maxP * 0.94 - s.c) / s.d);
+  plot.label(qD, Math.max(D(qD), 0), "Demanda", C.demand, { dx: 6, dy: 12, box: true });
+  plot.label(qS, S(qS), "Oferta", C.supply, { dx: 6, dy: -6, box: true });
+
+  if (layers.notes) {
+    plot.tickP(eq.P, "P*", C.txt);
+    plot.tickQ(eq.Q, "Q*", C.txt);
+    plot.label(eq.Q, eq.P, "E", C.txt, { dx: 7, dy: -7, bold: true });
+    if (layers.cs)
+      plot.label(eq.Q * 0.30, (s.a + eq.P) / 2, "EC", C.csLine, { bold: true, align: "center" });
+    if (layers.ps)
+      plot.label(eq.Q * 0.30, (s.c + eq.P) / 2, "EP", C.psLine, { bold: true, align: "center" });
+  }
+
+  // numeros
+  const EC = 0.5 * (s.a - eq.P) * eq.Q;
+  const EP = 0.5 * (eq.P - s.c) * eq.Q;
+
+  document.getElementById("m-p").textContent     = fmt.n(eq.P);
+  document.getElementById("m-q").textContent     = fmt.n(eq.Q);
+  document.getElementById("m-gasto").textContent = fmt.n(eq.P * eq.Q);
+  document.getElementById("m-ec").textContent    = fmt.n(EC);
+  document.getElementById("m-ep").textContent    = fmt.n(EP);
+  document.getElementById("m-tot").textContent   = fmt.n(EC + EP);
+
+  document.getElementById("algebra").innerHTML =
+    '<div class="step">Q* = (a − c) / (b + d) = (' + s.a + ' − ' + s.c + ') / (' +
+      fmt.n(s.b,1) + ' + ' + fmt.n(s.d,1) + ') = <span class="res">' + fmt.n(eq.Q) + '</span></div>' +
+    '<div class="step">P* = a − b·Q* = ' + s.a + ' − ' + fmt.n(s.b,1) + '·' + fmt.n(eq.Q) +
+      ' = <span class="res">' + fmt.n(eq.P) + '</span></div>' +
+    '<div class="step">EC = 1/2 · (a − P*) · Q* = 1/2 · ' + fmt.n(s.a - eq.P) + ' · ' + fmt.n(eq.Q) +
+      ' = <span class="res">' + fmt.n(EC) + '</span></div>' +
+    '<div class="step">EP = 1/2 · (P* − c) · Q* = 1/2 · ' + fmt.n(eq.P - s.c) + ' · ' + fmt.n(eq.Q) +
+      ' = <span class="res">' + fmt.n(EP) + '</span></div>' +
+    '<div class="step">Excedente total = EC + EP = <span class="res">' + fmt.n(EC + EP) + '</span></div>';
+
+  nota.textContent =
+    "El precio reparte la torta: los compradores con disposición a pagar sobre P* se quedan con el área naranja, " +
+    "y los vendedores con costo bajo P* con la verde. Ninguna otra cantidad hace más grande la suma de las dos.";
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+initTools({ state, defaults, layers, layerDefaults, format, render, canvas: "c-main", file: "m07-equilibrio" });
+</script>
+</body>
+</html>

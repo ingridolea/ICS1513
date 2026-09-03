@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bienestar con impuesto — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Bienestar con impuesto: EC, EP, recaudaci&oacute;n y p&eacute;rdida social</h1>
+  <span>M13 &middot; Pol&iacute;ticas p&uacute;blicas</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="chip" data-layer="letras"><span class="dot" style="background:var(--pu-mid)"></span>&Aacute;reas A&ndash;F</button>
+    <button class="chip" data-layer="colores"><span class="dot" style="background:var(--c-cs-line)"></span>Colores por agente</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title">Bienestar social = EC + EP + recaudaci&oacute;n del Estado</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-cs)"></span>A &mdash; nuevo excedente del consumidor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-fiscal)"></span>B + D &mdash; recaudaci&oacute;n fiscal</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-dwl)"></span>C + E &mdash; p&eacute;rdida social</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-ps)"></span>F &mdash; nuevo excedente del productor</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Impuesto</div>
+        <div class="sr"><div class="sh"><span class="sn">Impuesto por unidad (t)</span><span class="sv" id="v-t">4.0</span></div>
+          <input type="range" data-p="t" min="0" max="16" step="0.5" value="4"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Demanda &nbsp;P = a &minus; b&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (a)</span><span class="sv" id="v-a">20</span></div>
+          <input type="range" data-p="a" min="8" max="40" step="0.5" value="20"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (b)</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Oferta &nbsp;P = c + d&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (c)</span><span class="sv" id="v-c">2</span></div>
+          <input type="range" data-p="c" min="0" max="15" step="0.5" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (d)</span><span class="sv" id="v-d">1.0</span></div>
+          <input type="range" data-p="d" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="wtable" id="tabla">
+      <thead><tr><th></th><th>Sin impuesto</th><th>Con impuesto</th><th>&Aacute;reas</th><th>Cambio</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Mercado</div>
+      <div class="metric"><div class="ml">Q&prime; con impuesto</div><div class="mv" id="m-q">&mdash;</div></div>
+      <div class="metric"><div class="ml">Q* sin impuesto</div><div class="mv" id="m-qeq">&mdash;</div></div>
+      <div class="metric"><div class="ml">Unidades que dejan de transarse</div><div class="mv" id="m-dq">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Cuentas del Estado</div>
+      <div class="metric"><div class="ml">Recaudaci&oacute;n B + D</div><div class="mv" id="m-rec">&mdash;</div></div>
+      <div class="metric"><div class="ml">P&eacute;rdida social C + E</div><div class="mv" id="m-dwl">&mdash;</div></div>
+      <div class="metric"><div class="ml">Costo por peso recaudado</div><div class="mv" id="m-ratio">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, initTools } = ICS;
+
+const defaults = { t: 4, a: 20, b: 1, c: 2, d: 1 };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { letras: true, colores: true };
+const layers        = Object.assign({}, layerDefaults);
+
+const format = { t: v => v.toFixed(1), a: v => v.toFixed(1), b: v => v.toFixed(1),
+                 c: v => v.toFixed(1), d: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 400 });
+
+function render() {
+  const s = state;
+  const D = q => s.a - s.b * q;
+  const S = q => s.c + s.d * q;
+  const Qeq = (s.a - s.c) / (s.b + s.d);
+  const Peq = D(Qeq);
+
+  const t = Math.min(s.t, Math.max(0, s.a - s.c));
+  const Q1 = Math.max(0, (s.a - s.c - t) / (s.b + s.d));
+  const PD = s.a - s.b * Q1;
+  const PS = PD - t;
+
+  // las seis areas de la lamina
+  const A = 0.5 * (s.a - PD) * Q1;
+  const B = (PD - Peq) * Q1;
+  const Cc = 0.5 * (PD - Peq) * (Qeq - Q1);
+  const Dd = (Peq - PS) * Q1;
+  const E = 0.5 * (Peq - PS) * (Qeq - Q1);
+  const F = 0.5 * (PS - s.c) * Q1;
+
+  const maxQ = Qeq * 2.1, maxP = s.a * 1.12;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad", "Precio", { skipP: [PD, PS, Peq], skipQ: [Q1, Qeq] });
+
+  const gris = "rgba(120,120,140,0.16)";
+  const col = k => layers.colores ? k : gris;
+
+  // A: excedente del consumidor que queda
+  plot.area([[0, s.a], [Q1, PD], [0, PD]], col(C.cs), C.csLine);
+  // B y D: recaudacion
+  plot.rect(0, Peq, Q1, PD, col(C.fiscal), C.fiscalLine);
+  plot.rect(0, PS, Q1, Peq, col(C.fiscal), C.fiscalLine);
+  // C y E: perdida social
+  plot.area([[Q1, PD], [Qeq, Peq], [Q1, Peq]], col(C.dwl), C.dwlLine);
+  plot.area([[Q1, Peq], [Qeq, Peq], [Q1, PS]], col(C.dwl), C.dwlLine);
+  // F: excedente del productor que queda
+  plot.area([[0, s.c], [Q1, PS], [0, PS]], col(C.ps), C.psLine);
+
+  plot.curve(D, C.demand, { width: 2.4, to: s.a / s.b });
+  plot.curve(S, C.supply, { width: 2.4 });
+
+  plot.seg(Qeq, 0, Qeq, Peq, C.muted, { dash: [3, 3], width: 1 });
+  plot.seg(Q1, 0, Q1, PD, C.muted, { dash: [4, 3], width: 1 });
+  plot.seg(0, Peq, Qeq, Peq, C.muted, { dash: [3, 3], width: 1 });
+  plot.tickP(PD, "P_D", C.txt);
+  plot.tickP(Peq, "P*", C.muted);
+  plot.tickP(PS, "P_S", C.txt);
+  plot.tickQ(Q1, "Q′", C.txt);
+  plot.tickQ(Qeq, "Q*", C.muted);
+  plot.dot(Qeq, Peq, C.muted);
+
+  if (layers.letras && Q1 > 0) {
+    const mid = Q1 * 0.35, gap = Qeq - Q1;
+    plot.label(mid, (s.a + PD) / 2, "A", C.txt, { bold: true, align: "center" });
+    plot.label(mid, (PD + Peq) / 2, "B", C.txt, { bold: true, align: "center" });
+    plot.label(mid, (PS + Peq) / 2, "D", C.txt, { bold: true, align: "center" });
+    plot.label(mid, (s.c + PS) / 2, "F", C.txt, { bold: true, align: "center" });
+    if (gap > 0.15) {
+      plot.label(Q1 + gap * 0.3, Peq + (PD - Peq) * 0.35, "C", C.dwlLine, { bold: true, align: "center" });
+      plot.label(Q1 + gap * 0.3, Peq - (Peq - PS) * 0.35, "E", C.dwlLine, { bold: true, align: "center" });
+    }
+  }
+
+  if (t > 0.01) plot.spanV(PS, PD, Q1, "Impuesto " + fmt.n(t), C.policy);
+  plot.label(maxQ * 0.86, Math.max(D(maxQ * 0.86), 0), "Demanda", C.demand, { dx: 4, dy: 13, align: "right", box: true });
+  plot.label(maxQ * 0.86, S(maxQ * 0.86), "Oferta", C.supply, { dx: 4, dy: -6, align: "right", box: true });
+
+  // tabla igual a la de la lamina
+  const filas = [
+    ["Excedente del consumidor", A + B + Cc, A, "A+B+C", "A", "−B−C"],
+    ["Excedente del productor",  Dd + E + F, F, "D+E+F", "F", "−D−E"],
+    ["Recaudación del Estado",   0, B + Dd,   "nada",   "B+D", "+B+D"],
+    ["Excedente total", A + B + Cc + Dd + E + F, A + B + Dd + F, "A+B+C+D+E+F", "A+B+D+F", "−C−E"]
+  ];
+  document.querySelector("#tabla tbody").innerHTML = filas.map(([n, v0, v1, a0, a1, ch]) => {
+    const dif = v1 - v0;
+    return "<tr><td>" + n + "</td><td>" + fmt.n(v0) + "<br><span style='opacity:.5'>" + a0 + "</span></td>" +
+      "<td>" + fmt.n(v1) + "<br><span style='opacity:.5'>" + a1 + "</span></td>" +
+      "<td style='opacity:.6'>" + ch + "</td>" +
+      '<td class="' + (dif > 0.005 ? "pos" : dif < -0.005 ? "neg" : "") + '">' +
+      (dif > 0.005 ? "+" : "") + fmt.n(dif) + "</td></tr>";
+  }).join("");
+
+  const rec = B + Dd, dwl = Cc + E;
+  document.getElementById("m-q").textContent    = fmt.n(Q1);
+  document.getElementById("m-qeq").textContent  = fmt.n(Qeq);
+  document.getElementById("m-dq").textContent   = fmt.n(Qeq - Q1);
+  document.getElementById("m-rec").textContent  = fmt.n(rec);
+  document.getElementById("m-dwl").textContent  = fmt.n(dwl);
+  document.getElementById("m-ratio").textContent = rec > 0.01 ? fmt.n(dwl / rec) : "—";
+
+  document.getElementById("note").textContent = t < 0.01
+    ? "Sin impuesto el excedente total es el máximo posible y no hay pérdida social. Sube t para ver aparecer la cuña."
+    : "El Estado recauda " + fmt.n(rec) + ", que sale del bolsillo de consumidores y productores: eso es una transferencia, no una pérdida. " +
+      "Lo que sí se pierde son los triángulos C y E, " + fmt.n(dwl) + ", que corresponden a " + fmt.n(Qeq - Q1) +
+      " unidades que dejaron de transarse pese a que el comprador las valoraba en más de lo que costaba producirlas.";
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+initTools({ state, defaults, layers, layerDefaults, format, render,
+            canvas: "c-main", file: "m13-bienestar-impuesto" });
+</script>
+</body>
+</html>

@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Excedentes y Bienestar — ICS1513</title>
+<style>
+:root {
+  --pu-lightest: #d3b4f3;
+  --pu-light:    #c491f6;
+  --pu-mid:      #9454d5;
+  --pu-dark:     #4e3961;
+  --pu-carbon:   #424243;
+  --pu-gray:     #d9d7d7;
+  --pu-bg:       #f7f3fe;
+  --pu-white:    #ffffff;
+
+  --c-demand:    #4e3961;
+  --c-supply:    #0f6e56;
+  --c-smc-neg:   #9454d5;
+  --c-smc-pos:   #c491f6;
+  --c-cs:        rgba(196,145,246,0.22);
+  --c-ps:        rgba(15,110,86,0.18);
+  --c-dwl:       rgba(148,84,213,0.30);
+  --c-fiscal:    rgba(78,57,97,0.22);
+  --c-grid:      rgba(148,84,213,0.10);
+  --c-axis:      rgba(66,66,67,0.55);
+  --c-txt:       #2a1a3e;
+  --c-muted:     rgba(66,66,67,0.45);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--pu-bg);
+  color: var(--c-txt);
+  min-height: 100vh;
+  padding: 24px 20px 40px;
+}
+
+header {
+  max-width: 960px;
+  margin: 0 auto 24px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  border-bottom: 2px solid var(--pu-mid);
+  padding-bottom: 12px;
+}
+
+header h1 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--pu-dark);
+  letter-spacing: -0.01em;
+}
+
+header span {
+  font-size: 13px;
+  color: var(--pu-mid);
+  font-weight: 500;
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.top-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.tab {
+  font-size: 13px;
+  padding: 6px 16px;
+  border: 1.5px solid var(--pu-mid);
+  border-radius: 20px;
+  background: transparent;
+  color: var(--pu-mid);
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab:hover { background: rgba(148,84,213,0.08); }
+.tab.active { background: var(--pu-mid); color: #fff; }
+
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 600px) { .panels { grid-template-columns: 1fr; } }
+
+.panel {
+  background: var(--pu-white);
+  border-radius: 12px;
+  border: 1px solid rgba(148,84,213,0.18);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pu-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+canvas { display: block; width: 100%; border-radius: 6px; }
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  background: var(--pu-white);
+  border-radius: 10px;
+  border: 1px solid rgba(148,84,213,0.15);
+  padding: 10px 14px;
+}
+
+.leg-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--c-muted); }
+.leg-line { width: 22px; flex-shrink: 0; }
+.leg-swatch { width: 13px; height: 13px; border-radius: 3px; flex-shrink: 0; }
+
+.sliders-wrap {
+  background: var(--pu-white);
+  border-radius: 12px;
+  border: 1px solid rgba(148,84,213,0.15);
+  padding: 16px;
+}
+
+.sliders {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 480px) { .sliders { grid-template-columns: 1fr; } }
+
+.slider-group { display: flex; flex-direction: column; gap: 8px; }
+.group-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pu-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.sr { display: flex; flex-direction: column; gap: 2px; }
+.sh { display: flex; justify-content: space-between; align-items: baseline; }
+.sn { font-size: 12px; color: var(--c-txt); }
+.sv { font-size: 12px; font-weight: 600; color: var(--pu-dark); min-width: 28px; text-align: right; }
+
+input[type=range] {
+  width: 100%;
+  accent-color: var(--pu-mid);
+  height: 4px;
+}
+
+.ext-row { grid-column: 1 / -1; }
+
+.divider {
+  border: none;
+  border-top: 1px solid rgba(148,84,213,0.12);
+  margin: 4px 0;
+}
+
+.metrics-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 600px) { .metrics-row { grid-template-columns: 1fr; } }
+
+.mgroup {
+  background: var(--pu-white);
+  border-radius: 12px;
+  border: 1px solid rgba(148,84,213,0.15);
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.metric { padding: 7px 10px; background: var(--pu-bg); border-radius: 8px; }
+.metric.full { grid-column: 1 / -1; background: rgba(148,84,213,0.08); }
+.ml { font-size: 10px; color: var(--pu-mid); font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+.mv { font-size: 14px; font-weight: 600; color: var(--pu-dark); }
+
+.mgroup-label {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--pu-mid);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Excedentes y Bienestar</h1>
+  <span>ICS1513 Economía</span>
+</header>
+
+<div class="app">
+  <div class="top-bar">
+    <button class="tab active" onclick="setType('negativa',this)">Externalidad negativa</button>
+    <button class="tab" onclick="setType('positiva',this)">Externalidad positiva</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Sin corrección</div>
+      <canvas id="c-left" height="300"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title" id="title-right">Con impuesto pigouviano</div>
+      <canvas id="c-right" height="300"></canvas>
+    </div>
+  </div>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="sliders-wrap">
+    <div class="sliders">
+      <div class="slider-group">
+        <div class="group-label">Demanda &nbsp;P = a − b·Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (a)</span><span class="sv" id="v-a">20</span></div><input type="range" min="10" max="40" step="1" value="20" id="s-a" oninput="update()"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (b)</span><span class="sv" id="v-b">1.0</span></div><input type="range" min="0.5" max="3" step="0.1" value="1.0" id="s-b" oninput="update()"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Oferta privada &nbsp;P = c + d·Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (c)</span><span class="sv" id="v-c">2</span></div><input type="range" min="0" max="15" step="1" value="2" id="s-c" oninput="update()"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (d)</span><span class="sv" id="v-d">1.0</span></div><input type="range" min="0.5" max="3" step="0.1" value="1.0" id="s-d" oninput="update()"></div>
+      </div>
+      <div class="slider-group ext-row">
+        <div class="group-label" id="ext-label-g">Costo externo por unidad (Ce)</div>
+        <div class="sr"><div class="sh"><span class="sn" id="ext-name">Ce</span><span class="sv" id="v-ce">4</span></div><input type="range" min="1" max="12" step="1" value="4" id="s-ce" oninput="update()"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-row" id="metrics-row"></div>
+</div>
+
+<script>
+let extType = 'negativa';
+
+const C = {
+  demand:  '#4e3961',
+  supply:  '#0f6e56',
+  smc_neg: '#9454d5',
+  smc_pos: '#c491f6',
+  cs:      'rgba(196,145,246,0.22)',
+  ps:      'rgba(15,110,86,0.18)',
+  dwl:     'rgba(148,84,213,0.30)',
+  fiscal:  'rgba(78,57,97,0.22)',
+  grid:    'rgba(148,84,213,0.10)',
+  axis:    'rgba(66,66,67,0.55)',
+  txt:     '#2a1a3e',
+  muted:   'rgba(66,66,67,0.45)',
+};
+
+function setType(t, btn) {
+  extType = t;
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('title-right').textContent = t === 'negativa' ? 'Con impuesto pigouviano' : 'Con subsidio pigouviano';
+  document.getElementById('ext-label-g').textContent = t === 'negativa' ? 'Costo externo por unidad (Ce)' : 'Beneficio externo por unidad (Be)';
+  document.getElementById('ext-name').textContent = t === 'negativa' ? 'Ce' : 'Be';
+  update();
+}
+
+function getP() {
+  return {
+    a: +document.getElementById('s-a').value,
+    b: +document.getElementById('s-b').value,
+    c: +document.getElementById('s-c').value,
+    d: +document.getElementById('s-d').value,
+    ce: +document.getElementById('s-ce').value,
+  };
+}
+
+function syncLabels(p) {
+  document.getElementById('v-a').textContent = p.a;
+  document.getElementById('v-b').textContent = p.b.toFixed(1);
+  document.getElementById('v-c').textContent = p.c;
+  document.getElementById('v-d').textContent = p.d.toFixed(1);
+  document.getElementById('v-ce').textContent = p.ce;
+}
+
+function eqm(a, b, c, d) { const Q = (a - c) / (b + d); return { Q, P: a - b * Q }; }
+
+function drawGraph(canvasId, scenario, p) {
+  const canvas = document.getElementById(canvasId);
+  const W = canvas.offsetWidth, H = canvas.offsetHeight;
+  canvas.width = W * devicePixelRatio;
+  canvas.height = H * devicePixelRatio;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+
+  const pad = { l: 46, r: 16, t: 16, b: 38 };
+  const gW = W - pad.l - pad.r, gH = H - pad.t - pad.b;
+  const eqBase = eqm(p.a, p.b, p.c, p.d);
+  const maxQ = eqBase.Q * 2.2, maxP = p.a * 1.1;
+
+  const tx = q => pad.l + (q / maxQ) * gW;
+  const ty = pr => pad.t + gH - (pr / maxP) * gH;
+  const Dp = q => p.a - p.b * q;
+  const Sp = q => p.c + p.d * q;
+  const corrSupply = extType === 'negativa'
+    ? q => p.c + p.ce + p.d * q
+    : q => p.c - p.ce + p.d * q;
+
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.strokeStyle = C.grid; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 5; i++) {
+    const xg = pad.l + (i / 5) * gW, yg = pad.t + (i / 5) * gH;
+    ctx.beginPath(); ctx.moveTo(xg, pad.t); ctx.lineTo(xg, pad.t + gH); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pad.l, yg); ctx.lineTo(pad.l + gW, yg); ctx.stroke();
+  }
+  ctx.strokeStyle = C.axis; ctx.lineWidth = 1.2;
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, pad.t + gH); ctx.lineTo(pad.l + gW, pad.t + gH); ctx.stroke();
+
+  ctx.fillStyle = C.muted; ctx.font = '10px Segoe UI,system-ui,sans-serif';
+  ctx.textAlign = 'center'; ctx.fillText('Q', pad.l + gW, pad.t + gH + 26);
+  ctx.textAlign = 'right'; ctx.fillText('P', pad.l - 6, pad.t + 8);
+  for (let i = 1; i <= 4; i++) {
+    const qv = maxQ * i / 4, pv = maxP * i / 4;
+    ctx.textAlign = 'center'; ctx.fillText(qv.toFixed(1), tx(qv), pad.t + gH + 13);
+    ctx.textAlign = 'right'; ctx.fillText(pv.toFixed(1), pad.l - 3, ty(pv) + 3);
+  }
+
+  const eqPriv = eqm(p.a, p.b, p.c, p.d);
+
+  if (scenario === 'uncorrected') {
+    if (extType === 'negativa') {
+      const eqSoc = eqm(p.a, p.b, p.c + p.ce, p.d);
+      fill(ctx, [tx(0), ty(p.a), tx(eqPriv.Q), ty(eqPriv.P), tx(0), ty(eqPriv.P)], C.cs);
+      fill(ctx, [tx(0), ty(p.c), tx(eqPriv.Q), ty(eqPriv.P), tx(0), ty(eqPriv.P)], C.ps);
+      const Psmc = corrSupply(eqPriv.Q);
+      fill(ctx, [tx(eqSoc.Q), ty(eqSoc.P), tx(eqPriv.Q), ty(eqPriv.P), tx(eqPriv.Q), ty(Psmc)], C.dwl);
+      dash(ctx, tx, ty, eqPriv.Q, eqPriv.P, pad);
+      dash(ctx, tx, ty, eqSoc.Q, eqSoc.P, pad, '#aaa', true);
+      curve(ctx, tx, ty, 0, maxQ, corrSupply, C.smc_neg, 1.5, [5, 3]);
+      dot(ctx, tx, ty, eqPriv.Q, eqPriv.P, C.txt); dot(ctx, tx, ty, eqSoc.Q, eqSoc.P, '#aaa');
+      lbl(ctx, tx(eqPriv.Q) + 4, ty(eqPriv.P) - 7, 'E priv', C.txt);
+      lbl(ctx, tx(eqSoc.Q) + 4, ty(eqSoc.P) - 7, 'E soc', C.muted);
+    } else {
+      const Da = p.a + p.ce;
+      const eqSoc = eqm(Da, p.b, p.c, p.d);
+      fill(ctx, [tx(0), ty(p.a), tx(eqPriv.Q), ty(eqPriv.P), tx(0), ty(eqPriv.P)], C.cs);
+      fill(ctx, [tx(0), ty(p.c), tx(eqPriv.Q), ty(eqPriv.P), tx(0), ty(eqPriv.P)], C.ps);
+      fill(ctx, [tx(eqPriv.Q), ty(eqPriv.P), tx(eqSoc.Q), ty(eqSoc.P), tx(eqPriv.Q), ty(Da - p.b * eqPriv.Q)], C.dwl);
+      dash(ctx, tx, ty, eqPriv.Q, eqPriv.P, pad);
+      dash(ctx, tx, ty, eqSoc.Q, eqSoc.P, pad, '#aaa', true);
+      curve(ctx, tx, ty, 0, maxQ, q => Da - p.b * q, C.smc_pos, 1.5, [5, 3]);
+      dot(ctx, tx, ty, eqPriv.Q, eqPriv.P, C.txt); dot(ctx, tx, ty, eqSoc.Q, eqSoc.P, '#aaa');
+      lbl(ctx, tx(eqPriv.Q) + 4, ty(eqPriv.P) - 7, 'E priv', C.txt);
+      lbl(ctx, tx(eqSoc.Q) + 4, ty(eqSoc.P) - 7, 'E soc', C.muted);
+    }
+  } else {
+    if (extType === 'negativa') {
+      const eqT = eqm(p.a, p.b, p.c + p.ce, p.d);
+      const Pcons = eqT.P, Qt = eqT.Q, Pprod = Pcons - p.ce;
+      fill(ctx, [tx(0), ty(p.a), tx(Qt), ty(Pcons), tx(0), ty(Pcons)], C.cs);
+      fill(ctx, [tx(0), ty(p.c), tx(Qt), ty(Pprod), tx(0), ty(Pprod)], C.ps);
+      fill(ctx, [tx(0), ty(Pcons), tx(Qt), ty(Pcons), tx(Qt), ty(Pprod), tx(0), ty(Pprod)], C.fiscal);
+      dash(ctx, tx, ty, eqPriv.Q, eqPriv.P, pad, '#aaa', true);
+      dash(ctx, tx, ty, Qt, Pcons, pad);
+      ctx.setLineDash([2, 2]); ctx.strokeStyle = '#aaa'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(pad.l, ty(Pprod)); ctx.lineTo(tx(Qt), ty(Pprod)); ctx.stroke(); ctx.setLineDash([]);
+      curve(ctx, tx, ty, 0, maxQ, corrSupply, C.smc_neg, 1.5, [5, 3]);
+      dot(ctx, tx, ty, Qt, Pcons, C.txt); dot(ctx, tx, ty, eqPriv.Q, eqPriv.P, '#aaa');
+      lbl(ctx, tx(Qt) + 4, ty(Pcons) - 7, "E'", C.txt);
+      lbl(ctx, tx(eqPriv.Q) + 4, ty(eqPriv.P) - 7, 'E*', C.muted);
+    } else {
+      const Da = p.a + p.ce;
+      const eqOpt = eqm(Da, p.b, p.c, p.d);
+      const Pprod = eqOpt.P, Qs = eqOpt.Q, Pcons = Pprod - p.ce;
+      fill(ctx, [tx(0), ty(p.a), tx(Qs), ty(Pcons), tx(0), ty(Pcons)], C.cs);
+      fill(ctx, [tx(0), ty(p.c), tx(Qs), ty(Pprod), tx(0), ty(Pprod)], C.ps);
+      fill(ctx, [tx(0), ty(Pcons), tx(Qs), ty(Pcons), tx(Qs), ty(Pprod), tx(0), ty(Pprod)], C.fiscal);
+      dash(ctx, tx, ty, eqPriv.Q, eqPriv.P, pad, '#aaa', true);
+      dash(ctx, tx, ty, Qs, Pprod, pad);
+      ctx.setLineDash([2, 2]); ctx.strokeStyle = '#aaa'; ctx.lineWidth = 0.8;
+      ctx.beginPath(); ctx.moveTo(pad.l, ty(Pcons)); ctx.lineTo(tx(Qs), ty(Pcons)); ctx.stroke(); ctx.setLineDash([]);
+      curve(ctx, tx, ty, 0, maxQ, q => Da - p.b * q, C.smc_pos, 1.5, [5, 3]);
+      dot(ctx, tx, ty, Qs, Pprod, C.txt); dot(ctx, tx, ty, eqPriv.Q, eqPriv.P, '#aaa');
+      lbl(ctx, tx(Qs) + 4, ty(Pprod) - 7, "E'", C.txt);
+      lbl(ctx, tx(eqPriv.Q) + 4, ty(eqPriv.P) - 7, 'E*', C.muted);
+    }
+  }
+
+  curve(ctx, tx, ty, 0, maxQ, Dp, C.demand, 2);
+  curve(ctx, tx, ty, 0, maxQ, Sp, C.supply, 2);
+}
+
+function fill(ctx, pts, color) {
+  ctx.fillStyle = color; ctx.beginPath();
+  ctx.moveTo(pts[0], pts[1]);
+  for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+  ctx.closePath(); ctx.fill();
+}
+
+function curve(ctx, tx, ty, q0, qMax, fn, color, lw, dsh = []) {
+  ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.setLineDash(dsh); ctx.beginPath();
+  for (let i = 0; i <= 120; i++) {
+    const q = q0 + (qMax - q0) * i / 120, pr = fn(q);
+    if (pr < 0) continue;
+    i === 0 ? ctx.moveTo(tx(q), ty(pr)) : ctx.lineTo(tx(q), ty(pr));
+  }
+  ctx.stroke(); ctx.setLineDash([]);
+}
+
+function dash(ctx, tx, ty, Q, Pv, pad, color = '#999', soft = false) {
+  ctx.strokeStyle = color; ctx.lineWidth = soft ? 0.7 : 1; ctx.setLineDash(soft ? [3, 3] : [4, 3]);
+  ctx.beginPath(); ctx.moveTo(tx(Q), ty(0)); ctx.lineTo(tx(Q), ty(Pv)); ctx.lineTo(pad.l, ty(Pv)); ctx.stroke(); ctx.setLineDash([]);
+}
+
+function dot(ctx, tx, ty, Q, Pv, color) {
+  ctx.fillStyle = color; ctx.beginPath(); ctx.arc(tx(Q), ty(Pv), 3.5, 0, Math.PI * 2); ctx.fill();
+}
+
+function lbl(ctx, x, y, text, color) {
+  ctx.fillStyle = color; ctx.font = '10px Segoe UI,system-ui,sans-serif'; ctx.textAlign = 'left'; ctx.fillText(text, x, y);
+}
+
+function calcMetrics(p) {
+  const eqPriv = eqm(p.a, p.b, p.c, p.d);
+  if (extType === 'negativa') {
+    const eqSoc = eqm(p.a, p.b, p.c + p.ce, p.d);
+    const CS_u = 0.5 * (p.a - eqPriv.P) * eqPriv.Q;
+    const PS_u = 0.5 * (eqPriv.P - p.c) * eqPriv.Q;
+    const ExtCost = p.ce * eqPriv.Q;
+    const DWL = 0.5 * p.ce * (eqPriv.Q - eqSoc.Q);
+    const Qt = eqSoc.Q, Pcons = eqSoc.P, Pprod = Pcons - p.ce;
+    const CS_c = 0.5 * (p.a - Pcons) * Qt;
+    const PS_c = 0.5 * (Pprod - p.c) * Qt;
+    const TaxRev = p.ce * Qt;
+    return {
+      left:  [['EC', CS_u.toFixed(2)], ['EP', PS_u.toFixed(2)], ['Costo externo', '-' + ExtCost.toFixed(2)], ['Bienestar neto', (CS_u + PS_u - ExtCost).toFixed(2)], ['DWL', DWL.toFixed(2)]],
+      right: [['EC', CS_c.toFixed(2)], ['EP', PS_c.toFixed(2)], ['Recaudación', TaxRev.toFixed(2)], ['Bienestar total', (CS_c + PS_c + TaxRev).toFixed(2)], ['DWL', '0.00']],
+      ltitle: 'Sin corrección', rtitle: 'Con impuesto',
+    };
+  } else {
+    const Da = p.a + p.ce;
+    const eqSoc = eqm(Da, p.b, p.c, p.d);
+    const CS_u = 0.5 * (p.a - eqPriv.P) * eqPriv.Q;
+    const PS_u = 0.5 * (eqPriv.P - p.c) * eqPriv.Q;
+    const BenExt = p.ce * eqPriv.Q;
+    const DWL = 0.5 * p.ce * (eqSoc.Q - eqPriv.Q);
+    const Qs = eqSoc.Q, Pprod = eqSoc.P, Pcons = Pprod - p.ce;
+    const CS_c = 0.5 * (p.a - Pcons) * Qs;
+    const PS_c = 0.5 * (Pprod - p.c) * Qs;
+    const SubCost = p.ce * Qs;
+    return {
+      left:  [['EC', CS_u.toFixed(2)], ['EP', PS_u.toFixed(2)], ['Benef. externo', BenExt.toFixed(2)], ['Bienestar neto', (CS_u + PS_u + BenExt).toFixed(2)], ['DWL', DWL.toFixed(2)]],
+      right: [['EC', CS_c.toFixed(2)], ['EP', PS_c.toFixed(2)], ['Costo subsidio', '-' + SubCost.toFixed(2)], ['Bienestar total', (CS_c + PS_c).toFixed(2)], ['DWL', '0.00']],
+      ltitle: 'Sin corrección', rtitle: 'Con subsidio',
+    };
+  }
+}
+
+function renderMetrics(m) {
+  const mk = (entries, title) => {
+    const rows = entries.map(([k, v]) => {
+      const full = ['Bienestar neto', 'Bienestar total'].includes(k) ? ' full' : '';
+      return `<div class="metric${full}"><div class="ml">${k}</div><div class="mv">${v}</div></div>`;
+    }).join('');
+    return `<div class="mgroup"><div class="mgroup-label">${title}</div>${rows}</div>`;
+  };
+  document.getElementById('metrics-row').innerHTML = mk(m.left, m.ltitle) + mk(m.right, m.rtitle);
+}
+
+function renderLegend() {
+  const neg = extType === 'negativa';
+  const items = [
+    { type: 'line', color: C.demand, label: 'Demanda' },
+    { type: 'line', color: C.supply, label: 'Oferta privada' },
+    { type: 'line', color: neg ? C.smc_neg : C.smc_pos, dash: true, label: neg ? 'CMgS (c/ ext.)' : 'BMgS (c/ ext.)' },
+    { type: 'swatch', color: C.cs, label: 'Exc. consumidor' },
+    { type: 'swatch', color: C.ps, label: 'Exc. productor' },
+    { type: 'swatch', color: C.dwl, label: 'Pérdida bienestar (DWL)' },
+    { type: 'swatch', color: C.fiscal, label: neg ? 'Recaudación fiscal' : 'Costo subsidio' },
+  ];
+  document.getElementById('legend').innerHTML = items.map(i => {
+    if (i.type === 'line') {
+      const style = i.dash
+        ? `border-top: 2px dashed ${i.color}; background: transparent; height: 0;`
+        : `border-top: 2px solid ${i.color}; background: transparent; height: 0;`;
+      return `<span class="leg-item"><span class="leg-line" style="${style}"></span>${i.label}</span>`;
+    }
+    return `<span class="leg-item"><span class="leg-swatch" style="background:${i.color};"></span>${i.label}</span>`;
+  }).join('');
+}
+
+function update() {
+  const p = getP();
+  syncLabels(p);
+  drawGraph('c-left', 'uncorrected', p);
+  drawGraph('c-right', 'corrected', p);
+  renderMetrics(calcMetrics(p));
+  renderLegend();
+}
+
+const ro = new ResizeObserver(update);
+ro.observe(document.getElementById('c-left'));
+ro.observe(document.getElementById('c-right'));
+update();
+</script>
+</body>
+</html>

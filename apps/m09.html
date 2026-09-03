@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Techo de precios — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Techo de precios</h1>
+  <span>M9 &middot; Pol&iacute;ticas p&uacute;blicas</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="chip" data-layer="escasez"><span class="dot" style="background:var(--c-policy)"></span>Escasez</button>
+    <button class="chip" data-layer="bienestar"><span class="dot" style="background:var(--c-cs-line)"></span>Bienestar</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" data-preset="nov">No vinculante (petr&oacute;leo 1973)</button>
+    <button class="tool-btn" data-preset="corto">Arriendos: corto plazo</button>
+    <button class="tool-btn" data-preset="largo">Arriendos: largo plazo</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Mercado con techo de precios</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Demanda</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Oferta</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-policy)" stroke-width="2.5"/></svg>Techo de precios</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-cs)"></span>Excedente consumidor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-ps)"></span>Excedente productor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-transfer)"></span>Transferencia productor &rarr; consumidor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-dwl)"></span>P&eacute;rdida social</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Pol&iacute;tica</div>
+        <div class="sr"><div class="sh"><span class="sn">Techo de precios</span><span class="sv" id="v-t">8.0</span></div>
+          <input type="range" data-p="t" min="0" max="24" step="0.5" value="8"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Demanda &nbsp;P = a &minus; b&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (a)</span><span class="sv" id="v-a">20</span></div>
+          <input type="range" data-p="a" min="8" max="40" step="0.5" value="20"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (b) &mdash; mayor = m&aacute;s inel&aacute;stica</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Oferta &nbsp;P = c + d&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (c)</span><span class="sv" id="v-c">2</span></div>
+          <input type="range" data-p="c" min="0" max="15" step="0.5" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (d) &mdash; mayor = m&aacute;s inel&aacute;stica</span><span class="sv" id="v-d">1.0</span></div>
+          <input type="range" data-p="d" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Mercado</div>
+      <div class="metric"><div class="ml">Cantidad ofrecida Q<sub>S</sub></div><div class="mv" id="m-qs">&mdash;</div></div>
+      <div class="metric"><div class="ml">Cantidad demandada Q<sub>D</sub></div><div class="mv" id="m-qd">&mdash;</div></div>
+      <div class="metric"><div class="ml">Escasez</div><div class="mv" id="m-esc">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Efectos</div>
+      <div class="metric"><div class="ml">Transferencia al consumidor</div><div class="mv" id="m-tr">&mdash;</div></div>
+      <div class="metric"><div class="ml">P&eacute;rdida social</div><div class="mv" id="m-dwl">&mdash;</div></div>
+      <div class="metric"><div class="ml">Compradores que se quedan sin bien</div><div class="mv" id="m-fuera">&mdash;</div></div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="wtable" id="tabla">
+      <thead><tr><th></th><th>Sin techo</th><th>Con techo</th><th>Cambio</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, bindPresets, initTools } = ICS;
+
+const defaults = { t: 8, a: 20, b: 1, c: 2, d: 1 };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { escasez: true, bienestar: true };
+const layers        = Object.assign({}, layerDefaults);
+
+// a y c fijos con b = d mantienen P* = 11: los tres escenarios son comparables
+const presets = {
+  nov:   { a: 20, b: 1,   c: 2, d: 1,   t: 14 },
+  corto: { a: 20, b: 2.5, c: 2, d: 2.5, t: 8  },
+  largo: { a: 20, b: 0.8, c: 2, d: 0.8, t: 8  }
+};
+
+const format = { t: v => v.toFixed(1), a: v => v.toFixed(1), b: v => v.toFixed(1),
+                 c: v => v.toFixed(1), d: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 390 });
+
+function render() {
+  const s = state;
+  const D = q => s.a - s.b * q;
+  const S = q => s.c + s.d * q;
+  const Qeq = (s.a - s.c) / (s.b + s.d);
+  const Peq = D(Qeq);
+  const T = s.t;
+
+  const vinculante = T < Peq && s.a > s.c;
+  const Qs = Math.max(0, (T - s.c) / s.d);      // lo que los vendedores quieren vender
+  const Qd = Math.max(0, (s.a - T) / s.b);      // lo que los compradores quieren comprar
+  const Qtr = vinculante ? Qs : Qeq;            // lo que efectivamente se transa
+
+  document.getElementById("ptitle").textContent = vinculante
+    ? "Techo por debajo del precio de equilibrio: se genera desabastecimiento"
+    : "Techo por sobre el precio de equilibrio: no es vinculante";
+
+  const maxQ = Math.max(Qeq * 2.2, Qd * 1.12), maxP = Math.max(s.a, T) * 1.15;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad", "Precio", { skipP: [Peq, T], skipQ: [Qs, Qd, Qeq] });
+
+  // bienestar
+  const EC0 = 0.5 * (s.a - Peq) * Qeq, EP0 = 0.5 * (Peq - s.c) * Qeq;
+  let EC1 = EC0, EP1 = EP0, transf = 0, dwl = 0;
+
+  if (vinculante) {
+    EC1 = s.a * Qs - s.b * Qs * Qs / 2 - T * Qs;
+    EP1 = 0.5 * (T - s.c) * Qs;
+    transf = (Peq - T) * Qs;
+    dwl = (EC0 + EP0) - (EC1 + EP1);
+  }
+
+  if (layers.bienestar) {
+    if (vinculante) {
+      plot.area([[0, s.a], [Qs, D(Qs)], [Qs, T], [0, T]], C.cs, C.csLine);
+      plot.area([[0, s.c], [Qs, T], [0, T]], C.ps, C.psLine);
+      plot.rect(0, T, Qs, Peq, C.transfer, C.muted);
+      plot.area([[Qs, D(Qs)], [Qeq, Peq], [Qs, T]], C.dwl, C.dwlLine);
+    } else {
+      plot.area([[0, s.a], [Qeq, Peq], [0, Peq]], C.cs, C.csLine);
+      plot.area([[0, s.c], [Qeq, Peq], [0, Peq]], C.ps, C.psLine);
+    }
+  }
+
+  plot.curve(D, C.demand, { width: 2.4, to: s.a / s.b });
+  plot.curve(S, C.supply, { width: 2.4 });
+
+  // linea del techo
+  plot.seg(0, T, maxQ, T, C.policy, { width: 2.2 });
+  plot.tickP(T, "P̄", C.policy);
+
+  plot.seg(Qeq, 0, Qeq, Peq, C.muted, { dash: [4, 3], width: 1 });
+  plot.dot(Qeq, Peq, vinculante ? C.muted : C.txt);
+  plot.tickP(Peq, "P*", C.muted);
+  plot.tickQ(Qeq, "Q*", C.muted);
+
+  if (vinculante && layers.escasez) {
+    plot.seg(Qs, 0, Qs, T, C.muted, { dash: [4, 3], width: 1 });
+    plot.seg(Qd, 0, Qd, T, C.muted, { dash: [4, 3], width: 1 });
+    plot.tickQ(Qs, "Q_S", C.policy);
+    plot.tickQ(Qd, "Q_D", C.policy);
+    plot.spanH(Qs, Qd, T - maxP * 0.055, "Escasez " + fmt.n(Qd - Qs), C.policy);
+  }
+
+  plot.label(maxQ * 0.88, Math.max(D(maxQ * 0.88), 0), "Demanda", C.demand, { dx: 4, dy: 13, box: true });
+  plot.label(maxQ * 0.88, S(maxQ * 0.88), "Oferta", C.supply, { dx: 4, dy: -6, box: true });
+
+  // numeros
+  document.getElementById("m-qs").textContent  = fmt.n(vinculante ? Qs : Qeq);
+  document.getElementById("m-qd").textContent  = fmt.n(vinculante ? Qd : Qeq);
+  document.getElementById("m-esc").textContent = vinculante ? fmt.n(Qd - Qs) : "0.00";
+  document.getElementById("m-tr").textContent  = fmt.n(transf);
+  document.getElementById("m-dwl").textContent = fmt.n(dwl);
+  document.getElementById("m-fuera").textContent =
+    vinculante ? fmt.n(Qd - Qs) + " unidades" : "ninguno";
+
+  const fila = (nom, v0, v1) => {
+    const dif = v1 - v0;
+    return "<tr><td>" + nom + "</td><td>" + fmt.n(v0) + "</td><td>" + fmt.n(v1) + "</td>" +
+      '<td class="' + (dif > 0.005 ? "pos" : dif < -0.005 ? "neg" : "") + '">' +
+      (dif > 0.005 ? "+" : "") + fmt.n(dif) + "</td></tr>";
+  };
+  document.querySelector("#tabla tbody").innerHTML =
+    fila("Excedente del consumidor", EC0, EC1) +
+    fila("Excedente del productor", EP0, EP1) +
+    fila("Excedente total", EC0 + EP0, EC1 + EP1);
+
+  document.getElementById("note").textContent = vinculante
+    ? "Al precio máximo legal los vendedores solo quieren vender " + fmt.n(Qs) + " unidades, pero los compradores quieren " +
+      fmt.n(Qd) + ": faltan " + fmt.n(Qd - Qs) + ". El bien se acaba racionando de otra forma, por ejemplo con colas. " +
+      "Ojo con leer el cambio del consumidor: como grupo puede ganar (" + fmt.n(EC1 - EC0) +
+      "), pero eso mezcla a los que compran más barato con los que se quedan sin el bien."
+    : "El techo está sobre el precio de equilibrio, así que el mercado nunca lo toca: la política no cambia nada. " +
+      "Es lo que pasaba con el techo al petróleo en EE.UU. en 1973 antes de que subiera el precio internacional.";
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, layers, layerDefaults, format, render,
+            canvas: "c-main", file: "m09-techo-precios" });
+</script>
+</body>
+</html>

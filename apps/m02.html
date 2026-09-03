@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>De la escalera a la curva continua — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>De la escalera a la curva continua</h1>
+  <span>M2 &middot; Eficiencia de mercado</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="chip" data-layer="escalera"><span class="dot" style="background:var(--c-demand)"></span>Escalera discreta</button>
+    <button class="chip" data-layer="continua"><span class="dot" style="background:var(--c-cs-line)"></span>Curva continua</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" data-preset="pocos">4 compradores</button>
+    <button class="tool-btn" data-preset="muchos">200 compradores</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title">Excedente del consumidor: suma de rect&aacute;ngulos vs. tri&aacute;ngulo</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Demanda discreta (un escal&oacute;n por comprador)</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-cs-line)" stroke-width="2.5" stroke-dasharray="5 3"/></svg>Demanda continua P = a &minus; b&middot;Q</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-cs)"></span>Excedente medido con rect&aacute;ngulos</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders">
+      <div class="slider-group">
+        <div class="group-label">Mercado</div>
+        <div class="sr"><div class="sh"><span class="sn">N&uacute;mero de compradores (n)</span><span class="sv" id="v-n">4</span></div>
+          <input type="range" data-p="n" min="2" max="200" step="1" value="4"></div>
+        <div class="sr"><div class="sh"><span class="sn">Precio de mercado</span><span class="sv" id="v-p">8.0</span></div>
+          <input type="range" data-p="p" min="0" max="19" step="0.5" value="8"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Demanda &nbsp;P = a &minus; b&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (a)</span><span class="sv" id="v-a">20</span></div>
+          <input type="range" data-p="a" min="10" max="40" step="1" value="20"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (b)</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.5" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Excedente del consumidor</div>
+      <div class="metric"><div class="ml">Suma de rect&aacute;ngulos</div><div class="mv" id="m-disc">&mdash;</div></div>
+      <div class="metric"><div class="ml">&Aacute;rea del tri&aacute;ngulo</div><div class="mv" id="m-cont">&mdash;</div></div>
+      <div class="metric"><div class="ml">Error de la aproximaci&oacute;n</div><div class="mv" id="m-err">&mdash;</div></div>
+    </div>
+    <div class="mgroup">
+      <div class="mgroup-label">Detalle</div>
+      <div class="metric"><div class="ml">Compradores que compran</div><div class="mv" id="m-k">&mdash;</div></div>
+      <div class="metric"><div class="ml">Ancho de cada escal&oacute;n</div><div class="mv" id="m-d">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, bindPresets, initTools } = ICS;
+
+const defaults = { n: 4, p: 8, a: 20, b: 1 };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { escalera: true, continua: true };
+const layers        = Object.assign({}, layerDefaults);
+
+const presets = { pocos: { n: 4 }, muchos: { n: 200 } };
+
+const format = {
+  n: v => v.toFixed(0), p: v => v.toFixed(1),
+  a: v => v.toFixed(0), b: v => v.toFixed(1)
+};
+
+const plot = new Plot("c-main", { height: 370 });
+
+function render() {
+  const s = state;
+  const Qmax = s.a / s.b;            // cantidad con precio cero
+  const D    = q => s.a - s.b * q;
+  const dq   = Qmax / s.n;           // cada comprador se lleva este pedazo
+  const P    = Math.min(s.p, s.a);
+
+  // disposicion a pagar del comprador i, medida en el borde izquierdo de su escalon
+  const dap = i => s.a - s.b * i * dq;
+  const k   = Math.max(0, Math.min(s.n, Math.ceil((s.a - P) / (s.b * dq))));
+
+  const maxQ = Qmax * 1.06, maxP = s.a * 1.15;
+  plot.begin(maxQ, maxP).grid().axes("Cantidad", "Precio", { skipP: [P] });
+
+  const ctx = plot.ctx;
+
+  // area escalonada del excedente, en un solo trazo
+  if (k > 0) {
+    ctx.beginPath();
+    ctx.moveTo(plot.tx(0), plot.ty(P));
+    for (let i = 0; i < k; i++) {
+      ctx.lineTo(plot.tx(i * dq), plot.ty(dap(i)));
+      ctx.lineTo(plot.tx((i + 1) * dq), plot.ty(dap(i)));
+    }
+    ctx.lineTo(plot.tx(k * dq), plot.ty(P));
+    ctx.closePath();
+    ctx.fillStyle = C.cs; ctx.fill();
+  }
+
+  // escalera completa
+  if (layers.escalera) {
+    ctx.beginPath();
+    ctx.moveTo(plot.tx(0), plot.ty(maxP));
+    ctx.lineTo(plot.tx(0), plot.ty(dap(0)));
+    for (let i = 0; i < s.n; i++) {
+      ctx.lineTo(plot.tx((i + 1) * dq), plot.ty(dap(i)));
+      if (i < s.n - 1) ctx.lineTo(plot.tx((i + 1) * dq), plot.ty(dap(i + 1)));
+    }
+    ctx.lineTo(plot.tx(Qmax), plot.ty(0));
+    ctx.strokeStyle = C.demand;
+    ctx.lineWidth = s.n > 60 ? 1 : 2;
+    ctx.stroke();
+  }
+
+  if (layers.continua)
+    plot.curve(D, C.csLine, { width: 2.2, dash: [6, 4], to: Qmax });
+
+  plot.seg(0, P, maxQ, P, C.policy, { width: 2 });
+  plot.tickP(P, fmt.n(P, 1), C.policy);
+
+  if (layers.escalera)
+    plot.label(Qmax * 0.62, D(Qmax * 0.62), "Demanda discreta", C.demand,
+      { dx: 6, dy: -8, box: true });
+  if (layers.continua)
+    plot.label(Qmax * 0.32, D(Qmax * 0.32), "Demanda continua", C.csLine,
+      { dx: 6, dy: -8, box: true });
+
+  // numeros
+  let EC_disc = 0;
+  for (let i = 0; i < k; i++) EC_disc += (dap(i) - P) * dq;
+  const Qp = Math.max(0, (s.a - P) / s.b);
+  const EC_cont = 0.5 * (s.a - P) * Qp;
+  const err = EC_disc - EC_cont;
+
+  document.getElementById("m-disc").textContent = fmt.n(EC_disc);
+  document.getElementById("m-cont").textContent = fmt.n(EC_cont);
+  document.getElementById("m-err").innerHTML =
+    fmt.n(err) + (EC_cont > 0 ? '  <span class="unit">(' + (100 * err / EC_cont).toFixed(1) + "%)</span>" : "");
+  document.getElementById("m-k").textContent = k + " de " + s.n;
+  document.getElementById("m-d").textContent = fmt.n(dq, 3) + " unidades";
+
+  document.getElementById("algebra").innerHTML =
+    '<div class="step">Rectángulos:  Σ (DAP_i − P) · Δ  con Δ = ' + fmt.n(dq, 3) +
+      '  =  <span class="res">' + fmt.n(EC_disc) + '</span></div>' +
+    '<div class="step">Triángulo:    1/2 · (a − P) · Q(P) = 1/2 · ' + fmt.n(s.a - P) + ' · ' +
+      fmt.n(Qp) + '  =  <span class="res">' + fmt.n(EC_cont) + '</span></div>' +
+    '<div class="step">Diferencia:   <span class="res">' + fmt.n(err) + '</span></div>';
+
+  document.getElementById("note").textContent =
+    s.n <= 8
+      ? "Con pocos compradores la escalera sobra bastante por encima de la curva: el triángulo todavía es una aproximación gruesa."
+      : s.n < 60
+        ? "Al agregar compradores los escalones se achican y la escalera se pega a la curva. El error ya es de " +
+          (EC_cont > 0 ? (100 * err / EC_cont).toFixed(1) : "0") + "%."
+        : "Con " + s.n + " compradores la escalera es indistinguible de la curva. Por eso, en un mercado con muchos compradores, " +
+          "medimos el excedente como el área bajo la demanda y sobre el precio: la integral reemplaza a la suma.";
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, layers, layerDefaults, format, render,
+            canvas: "c-main", file: "m02-escalera-a-curva" });
+</script>
+</body>
+</html>

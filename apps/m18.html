@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oligopolio: Cártel, Desvío y Cournot</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Anaheim&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #f4f2f8;
+    --surface: #ffffff;
+    --border:  #ddd8ea;
+    --cartel:  #1a9e50;
+    --cartel-dim:  rgba(26,158,80,0.10);
+    --cartel-area: rgba(26,158,80,0.14);
+    --desvio1: #c0392b;
+    --desvio1-dim:  rgba(192,57,43,0.10);
+    --desvio2: #e67e22;
+    --desvio2-dim:  rgba(230,126,34,0.10);
+    --cournot: #1a5cb8;
+    --cournot-dim:  rgba(26,92,184,0.10);
+    --cournot-area: rgba(26,92,184,0.13);
+    --pie:     rgba(100,60,180,0.18);
+    --imgt:    #7b2d8e;
+    --cm:      #999;
+    --text:    #1a1a2e;
+    --muted:   #666;
+    --font: 'Anaheim', sans-serif;
+    --mono: 'DM Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+    gap: 18px;
+  }
+
+  h1 {
+    font-size: 1.2rem;
+    font-weight: 400;
+    letter-spacing: 0.03em;
+    color: #333;
+    text-align: center;
+  }
+  h1 span { color: var(--imgt); font-weight: 500; }
+
+  .subtitle {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: -10px;
+  }
+
+  /* TOGGLES */
+  .controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1.5px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    font-family: var(--font);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  }
+  .toggle-btn .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.3;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle-btn.active .dot { opacity: 1; }
+
+  .toggle-btn.cartel.active  { color: var(--cartel);  border-color: var(--cartel);  background: var(--cartel-dim); }
+  .toggle-btn.desvio1.active { color: var(--desvio1); border-color: var(--desvio1); background: var(--desvio1-dim); }
+  .toggle-btn.desvio2.active { color: var(--desvio2); border-color: var(--desvio2); background: var(--desvio2-dim); }
+  .toggle-btn.cournot.active { color: var(--cournot); border-color: var(--cournot); background: var(--cournot-dim); }
+
+  /* CANVAS */
+  .chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 14px 8px;
+    width: 100%;
+    max-width: 740px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+  }
+
+  canvas { display: block; width: 100%; height: auto; }
+
+  /* LEGEND */
+  .legend {
+    display: flex; gap: 16px; flex-wrap: wrap;
+    justify-content: center;
+    font-size: 0.75rem; color: var(--muted);
+  }
+  .legend-item { display: flex; align-items: center; gap: 5px; }
+  .legend-line { width: 20px; height: 2px; border-radius: 2px; }
+  .legend-dash { width: 20px; height: 0; border-top: 2px dashed; opacity: 0.7; }
+
+  /* INFO GRID */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 9px;
+    width: 100%;
+    max-width: 740px;
+  }
+  @media (max-width: 600px) {
+    .info-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .info-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    opacity: 0.35;
+    transition: opacity 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  }
+  .info-card.active {
+    opacity: 1;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  .info-card.cartel.active  { border-color: var(--cartel);  }
+  .info-card.desvio1.active { border-color: var(--desvio1); }
+  .info-card.desvio2.active { border-color: var(--desvio2); }
+  .info-card.cournot.active { border-color: var(--cournot); }
+
+  .info-card h3 {
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin-bottom: 9px;
+  }
+  .info-card.cartel  h3 { color: var(--cartel);  }
+  .info-card.desvio1 h3 { color: var(--desvio1); }
+  .info-card.desvio2 h3 { color: var(--desvio2); }
+  .info-card.cournot h3 { color: var(--cournot); }
+
+  .stat { margin-bottom: 4px; font-size: 0.78rem; color: var(--muted); }
+  .stat b { color: var(--text); font-family: var(--mono); font-weight: 500; font-size: 0.76rem; }
+
+  .note {
+    font-size: 0.71rem;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-top: 7px;
+    border-top: 1px solid var(--border);
+    padding-top: 7px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Oligopolio: <span>del cártel al equilibrio de Nash</span></h1>
+<p class="subtitle">p = 100 − Q &nbsp;·&nbsp; CM = 20 &nbsp;·&nbsp; Activa escenarios para superponerlos</p>
+
+<div class="controls">
+  <button class="toggle-btn cartel active"  onclick="tog('cartel',this)">
+    <span class="dot"></span> 1. Cártel
+  </button>
+  <button class="toggle-btn desvio1" onclick="tog('desvio1',this)">
+    <span class="dot"></span> 2. Desvío empresa 1
+  </button>
+  <button class="toggle-btn desvio2" onclick="tog('desvio2',this)">
+    <span class="dot"></span> 3. Respuesta empresa 2
+  </button>
+  <button class="toggle-btn cournot" onclick="tog('cournot',this)">
+    <span class="dot"></span> 4. Cournot–Nash
+  </button>
+</div>
+
+<div class="chart-wrap">
+  <canvas id="c" width="712" height="470"></canvas>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-line" style="background:#333"></div> Demanda (D)</div>
+  <div class="legend-item"><div class="legend-line" style="background:var(--imgt)"></div> IMg mercado</div>
+  <div class="legend-item"><div class="legend-dash" style="border-color:var(--desvio1)"></div> IMg₁ resid.</div>
+  <div class="legend-item"><div class="legend-dash" style="border-color:var(--desvio2)"></div> IMg₂ resid.</div>
+  <div class="legend-item"><div class="legend-dash" style="border-color:var(--cm)"></div> CM = 20</div>
+</div>
+
+<div class="info-grid">
+  <div class="info-card cartel active" id="card-cartel">
+    <h3>1 · Cártel</h3>
+    <div class="stat">Q total: <b>40</b></div>
+    <div class="stat">q₁ = q₂: <b>20</b></div>
+    <div class="stat">Precio: <b>p* = 60</b></div>
+    <div class="stat">Benef. total: <b>1600</b></div>
+    <div class="note">IMg = CM conjunto. Máximo beneficio de industria.</div>
+  </div>
+  <div class="info-card desvio1" id="card-desvio1">
+    <h3>2 · Desvío E1</h3>
+    <div class="stat">q₁: <b>20 → 30</b></div>
+    <div class="stat">q₂ fija: <b>20</b></div>
+    <div class="stat">Precio: <b>p' = 50</b></div>
+    <div class="stat">π₁ sube: <b>900 &gt; 800</b></div>
+    <div class="note">IMg₁ &gt; CM en q₁=20. Empresa 1 se desvía.</div>
+  </div>
+  <div class="info-card desvio2" id="card-desvio2">
+    <h3>3 · Respuesta E2</h3>
+    <div class="stat">q₁ fija: <b>30</b></div>
+    <div class="stat">q₂: <b>20 → 25</b></div>
+    <div class="stat">Precio: <b>p'' = 45</b></div>
+    <div class="stat">Benef. bajan: <b>ambas</b></div>
+    <div class="note">E2 también tiene IMg₂ &gt; CM dado q₁=30. Responde subiendo q₂.</div>
+  </div>
+  <div class="info-card cournot" id="card-cournot">
+    <h3>4 · Nash</h3>
+    <div class="stat">Q total: <b>≈ 53.3</b></div>
+    <div class="stat">q₁ = q₂: <b>≈ 26.7</b></div>
+    <div class="stat">Precio: <b>pN ≈ 46.7</b></div>
+    <div class="stat">Benef. total: <b>≈ 1422</b></div>
+    <div class="note">Ninguna quiere desviarse. Estable pero ineficiente.</div>
+  </div>
+</div>
+
+<script>
+const state = { cartel: true, desvio1: false, desvio2: false, cournot: false };
+
+function tog(key, btn) {
+  state[key] = !state[key];
+  btn.classList.toggle('active', state[key]);
+  document.getElementById('card-' + key).classList.toggle('active', state[key]);
+  draw();
+}
+
+// Canvas
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const W = 712, H = 470;
+const PAD = { left: 56, right: 28, top: 26, bottom: 42 };
+const gW = W - PAD.left - PAD.right, gH = H - PAD.top - PAD.bottom;
+const Q_MAX = 92, P_MAX = 108;
+
+function cx(q) { return PAD.left + (q / Q_MAX) * gW; }
+function cy(p) { return PAD.top + gH - (p / P_MAX) * gH; }
+
+// Model: p=100-Q, IMg=100-2Q, CM=20
+// Cartel: Q*=40, p*=60, q1=q2=20
+// Desvio1 (dado q2=20): D_resid=80-q1, IMg1=80-2q1=CM=20 -> q1=30, p=100-30-20=50
+// Desvio2 (dado q1=30): D_resid=70-q2, IMg2=70-2q2=CM=20 -> q2=25, p=100-30-25=45
+// Cournot: q1=q2=80/3≈26.67, Q=160/3≈53.33, p=140/3≈46.67
+
+const M = {
+  cartel:  { Q:40,      p:60,      q1:20,    q2:20   },
+  desvio1: { q1:30,     q2:20,     p:50                },
+  desvio2: { q1:30,     q2:25,     p:45                },
+  cournot: { Q:160/3,   p:140/3,   qi:80/3             },
+  cm: 20
+};
+
+const C = {
+  demand:  '#333333',
+  imgt:    '#7b2d8e',
+  cm:      '#aaa',
+  cartel:  '#1a9e50',
+  cartelA: 'rgba(26,158,80,0.13)',
+  desvio1: '#c0392b',
+  desvio1A:'rgba(255,180,80,0.25)',
+  desvio2: '#e67e22',
+  desvio2A:'rgba(230,126,34,0.13)',
+  cournot: '#1a5cb8',
+  cournotA:'rgba(26,92,184,0.12)',
+  pie:     'rgba(100,60,180,0.15)',
+  axis:    'rgba(40,40,60,0.7)',
+  grid:    'rgba(0,0,0,0.05)',
+};
+
+// Helpers
+function line(x1,y1,x2,y2,col,w=1.6,dash=[]) {
+  ctx.save(); ctx.strokeStyle=col; ctx.lineWidth=w; ctx.setLineDash(dash);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.restore();
+}
+function dot(x,y,r,fill,ring=null) {
+  ctx.save(); ctx.fillStyle=fill;
+  ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill();
+  if(ring){ ctx.strokeStyle=ring; ctx.lineWidth=2; ctx.stroke(); }
+  ctx.restore();
+}
+function lbl(t,x,y,col='#333',sz=10.5,align='left',base='middle',bold=false) {
+  ctx.save(); ctx.fillStyle=col;
+  ctx.font=`${bold?'600 ':''}${sz}px Anaheim,sans-serif`;
+  ctx.textAlign=align; ctx.textBaseline=base;
+  ctx.fillText(t,x,y); ctx.restore();
+}
+function poly(pts,col) {
+  ctx.save(); ctx.fillStyle=col;
+  ctx.beginPath(); ctx.moveTo(pts[0][0],pts[0][1]);
+  for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i][0],pts[i][1]);
+  ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function proj(q,p,col) {
+  line(cx(q),cy(p),cx(q),cy(0),col,1,[4,3]);
+  line(cx(0),cy(p),cx(q),cy(p),col,1,[4,3]);
+}
+function arrow(x1,y,x2,col,label,labelY) {
+  ctx.save();
+  ctx.strokeStyle=col; ctx.lineWidth=1.4;
+  ctx.beginPath(); ctx.moveTo(x1,y); ctx.lineTo(x2-2,y); ctx.stroke();
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.moveTo(x2+1,y); ctx.lineTo(x2-5,y-4); ctx.lineTo(x2-5,y+4); ctx.closePath(); ctx.fill();
+  ctx.restore();
+  if(label) lbl(label,(x1+x2)/2,labelY,col,9,'center');
+}
+
+function draw() {
+  ctx.clearRect(0,0,W,H);
+
+  // Background
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(PAD.left,PAD.top,gW,gH);
+
+  // Grid
+  ctx.save(); ctx.strokeStyle=C.grid; ctx.lineWidth=1;
+  for(let q=0;q<=90;q+=20){
+    ctx.beginPath(); ctx.moveTo(cx(q),PAD.top); ctx.lineTo(cx(q),cy(0)); ctx.stroke();
+  }
+  for(let p=0;p<=100;p+=20){
+    ctx.beginPath(); ctx.moveTo(PAD.left,cy(p)); ctx.lineTo(cx(Q_MAX),cy(p)); ctx.stroke();
+  }
+  ctx.restore();
+
+  // ── Áreas ──────────────────────────────────────────────────────────────
+
+  if(state.cournot) {
+    const qN=M.cournot.Q, pN=M.cournot.p;
+    poly([[cx(0),cy(pN)],[cx(qN),cy(pN)],[cx(qN),cy(20)],[cx(0),cy(20)]], C.cournotA);
+    poly([[cx(qN),cy(pN)],[cx(80),cy(20)],[cx(qN),cy(20)]], C.pie);
+  }
+  if(state.cartel) {
+    poly([[cx(0),cy(60)],[cx(40),cy(60)],[cx(40),cy(20)],[cx(0),cy(20)]], C.cartelA);
+    poly([[cx(40),cy(60)],[cx(80),cy(20)],[cx(40),cy(20)]], C.pie);
+  }
+  if(state.desvio2) {
+    // Ganancia extra E2: dado q1=30, de q2=20 a q2=25, entre CM y D_resid2
+    // D_resid2(q2) = 70 - q2; q2=20->50, q2=25->45
+    poly([[cx(20),cy(50)],[cx(25),cy(45)],[cx(25),cy(20)],[cx(20),cy(20)]], C.desvio2A);
+  }
+  if(state.desvio1) {
+    // Ganancia extra E1: dado q2=20, de q1=20 a q1=30, entre CM y D_resid1
+    // D_resid1(q1)=80-q1; q1=20->60, q1=30->50
+    poly([[cx(20),cy(60)],[cx(30),cy(50)],[cx(30),cy(20)],[cx(20),cy(20)]], C.desvio1A);
+  }
+
+  // ── CM ─────────────────────────────────────────────────────────────────
+  line(PAD.left,cy(20),cx(Q_MAX),cy(20),C.cm,1.4,[7,4]);
+  lbl('CM',cx(Q_MAX)+4,cy(20),C.cm,10.5);
+  lbl('20',PAD.left-5,cy(20),C.cm,9.5,'right');
+
+  // ── Demanda residual E2 (dado q1=30): p=70-q2 ─────────────────────────
+  if(state.desvio2) {
+    // q2=0->p=70; q2=50->p=20
+    line(cx(0),cy(70),cx(50),cy(20),C.desvio2,1.5,[5,3]);
+    lbl('D₂ resid (dado q₁=30)',cx(51),cy(20),C.desvio2,9,'left','middle');
+    // IMg2: 70-2q2=0->q2=35; q2=0->70
+    line(cx(0),cy(70),cx(35),cy(0),C.desvio2,1.5,[3,3]);
+    lbl('IMg₂',cx(36),cy(1),C.desvio2,9,'left','bottom');
+  }
+
+  // ── Demanda residual E1 (dado q2=20): p=80-q1 ──────────────────────────
+  if(state.desvio1) {
+    // q1=0->80; q1=60->20
+    line(cx(0),cy(80),cx(60),cy(20),C.desvio1,1.5,[5,3]);
+    lbl('D₁ resid (dado q₂=20)',cx(61),cy(20),C.desvio1,9,'left','middle');
+    // IMg1: 80-2q1=0->q1=40
+    line(cx(0),cy(80),cx(40),cy(0),C.desvio1,1.5,[3,3]);
+    lbl('IMg₁',cx(41),cy(1),C.desvio1,9,'left','bottom');
+  }
+
+  // ── Demanda total y IMg mercado ─────────────────────────────────────────
+  line(cx(0),cy(100),cx(80),cy(20),C.demand,2.2);
+  lbl('D',cx(82),cy(18),C.demand,12.5,'left','middle',true);
+  line(cx(0),cy(100),cx(50),cy(0),C.imgt,2);
+  lbl('IMg',cx(51),cy(1),C.imgt,11,'left','bottom',true);
+
+  // ── Puntos y proyecciones ───────────────────────────────────────────────
+
+  // Cournot Nash
+  if(state.cournot) {
+    const qN=M.cournot.Q, pN=M.cournot.p;
+    proj(qN,pN,C.cournot);
+    dot(cx(qN),cy(pN),7,C.cournot,'#fff');
+    dot(cx(qN),cy(20),4,C.cournot);
+    lbl('QN≈53',cx(qN),cy(0)+13,C.cournot,10.5,'center','top');
+    lbl('pN≈47',PAD.left-5,cy(pN),C.cournot,10.5,'right');
+    lbl('Benef.',cx(qN/2),cy((pN+20)/2+4),C.cournot,9,'center');
+    lbl('Nash',cx(qN/2),cy((pN+20)/2-5),C.cournot,9,'center');
+  }
+
+  // Desvío E2: punto q1=30, q2=25, p=45
+  if(state.desvio2) {
+    proj(25,45,C.desvio2);
+    // Punto en demanda total (q1+q2=55, p=45)
+    dot(cx(55),cy(45),6,C.desvio2,'#fff');
+    dot(cx(25),cy(45),5,C.desvio2); // punto en D_resid2
+    dot(cx(25),cy(20),4,C.desvio2);
+    lbl("q₂'=25",cx(25),cy(0)+13,C.desvio2,10,'center','top');
+    lbl("p''=45",PAD.left-5,cy(45),C.desvio2,10,'right');
+    // Flecha q2 20->25
+    arrow(cx(20),cy(0)+30,cx(25),C.desvio2,'Δq₂',cy(0)+24);
+  }
+
+  // Desvío E1: punto q1=30, q2=20, p=50
+  if(state.desvio1) {
+    proj(30,50,C.desvio1);
+    dot(cx(50),cy(50),6,C.desvio1,'#fff'); // en demanda total (q1+q2=50)
+    dot(cx(30),cy(50),5,C.desvio1); // en D_resid1
+    dot(cx(30),cy(20),4,C.desvio1);
+    lbl("q₁'=30",cx(30),cy(0)+13,C.desvio1,10,'center','top');
+    lbl("p'=50",PAD.left-5,cy(50),C.desvio1,10,'right');
+    // Flecha q1 20->30
+    arrow(cx(20),cy(0)+22,cx(30),C.desvio1,'Δq₁',cy(0)+16);
+  }
+
+  // Cártel
+  if(state.cartel) {
+    proj(40,60,C.cartel);
+    dot(cx(40),cy(60),7,C.cartel,'#fff');
+    dot(cx(40),cy(20),4,C.imgt);
+    lbl('Q*=40',cx(40),cy(0)+13,C.cartel,10.5,'center','top');
+    lbl('p*=60',PAD.left-5,cy(60),C.cartel,10.5,'right');
+    lbl('Benef.',cx(17),cy(43)+'',C.cartel,9,'center');
+    lbl('cártel',cx(17),cy(35)+'',C.cartel,9,'center');
+    lbl('PIE',cx(56),cy(28),C.imgt,9,'center');
+  }
+
+  // Punto cartel en eje Q (referencia cuando hay desvio)
+  if((state.desvio1||state.desvio2) && !state.cartel) {
+    lbl('q*=20',cx(20),cy(0)+13,'#aaa',9,'center','top');
+  }
+  if(state.desvio1||state.desvio2) {
+    // tick en q=20
+    line(cx(20),cy(0),cx(20),cy(0)+5,'#bbb',1);
+    lbl('20',cx(20),cy(0)+8,'#aaa',8,'center','top');
+  }
+
+  // ── Ejes ──────────────────────────────────────────────────────────────
+  ctx.save();
+  ctx.strokeStyle=C.axis; ctx.lineWidth=1.8;
+  ctx.beginPath(); ctx.moveTo(PAD.left,PAD.top-2); ctx.lineTo(PAD.left,cy(0)+1); ctx.stroke();
+  ctx.fillStyle=C.axis;
+  ctx.beginPath(); ctx.moveTo(PAD.left,PAD.top-6); ctx.lineTo(PAD.left-4,PAD.top+5); ctx.lineTo(PAD.left+4,PAD.top+5); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(PAD.left-2,cy(0)); ctx.lineTo(cx(Q_MAX)+2,cy(0)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(cx(Q_MAX)+6,cy(0)); ctx.lineTo(cx(Q_MAX)-1,cy(0)-4); ctx.lineTo(cx(Q_MAX)-1,cy(0)+4); ctx.closePath(); ctx.fill();
+  ctx.restore();
+
+  lbl('P',PAD.left,PAD.top-12,'#444',13,'center','middle',true);
+  lbl('Q',cx(Q_MAX)+12,cy(0),'#444',13,'center','middle',true);
+  lbl('0',PAD.left-5,cy(0)+2,'#aaa',9,'right','top');
+  lbl('100',PAD.left-5,cy(100),'#bbb',9,'right');
+  lbl('20',PAD.left-5,cy(20),C.cm,9,'right');
+  lbl('80',cx(80),cy(0)+8,'#bbb',9,'center','top');
+}
+
+draw();
+</script>
+</body>
+</html>

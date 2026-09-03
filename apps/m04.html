@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cálculo de ΔEC con demanda lineal — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>C&aacute;lculo de &Delta;EC con demanda lineal</h1>
+  <span>M4 &middot; Eficiencia de mercado</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tool-btn" data-preset="a">Ejemplo (a): EC en P* = 5</button>
+    <button class="tool-btn" data-preset="b">Ejemplo (b): P baja de 5 a 3</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title">&Aacute;rea entre P&#8322; y P&#8321; a la izquierda de la demanda</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Demanda &nbsp;Q<sub>D</sub>(P) = &alpha; &minus; &beta;P</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-cs)"></span>&Delta;EC = &int; Q<sub>D</sub>(P) dP entre P&#8322; y P&#8321;</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-policy)" stroke-width="2.5"/></svg>Precios</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders">
+      <div class="slider-group">
+        <div class="group-label">Precios</div>
+        <div class="sr"><div class="sh"><span class="sn">Precio inicial P&#8321;</span><span class="sv" id="v-p1">10.0</span></div>
+          <input type="range" data-p="p1" min="0" max="30" step="0.5" value="10"></div>
+        <div class="sr"><div class="sh"><span class="sn">Precio final P&#8322;</span><span class="sv" id="v-p2">5.0</span></div>
+          <input type="range" data-p="p2" min="0" max="30" step="0.5" value="5"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Demanda &nbsp;Q = &alpha; &minus; &beta;P</div>
+        <div class="sr"><div class="sh"><span class="sn">&alpha;</span><span class="sv" id="v-al">10</span></div>
+          <input type="range" data-p="al" min="4" max="30" step="1" value="10"></div>
+        <div class="sr"><div class="sh"><span class="sn">&beta;</span><span class="sv" id="v-be">1.0</span></div>
+          <input type="range" data-p="be" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Cantidades</div>
+      <div class="metric"><div class="ml">Q en P&#8321;</div><div class="mv" id="m-q1">&mdash;</div></div>
+      <div class="metric"><div class="ml">Q en P&#8322;</div><div class="mv" id="m-q2">&mdash;</div></div>
+      <div class="metric"><div class="ml">Precio de choque &alpha;/&beta;</div><div class="mv" id="m-choke">&mdash;</div></div>
+    </div>
+    <div class="mgroup">
+      <div class="mgroup-label">Excedente del consumidor</div>
+      <div class="metric full"><div class="ml" id="l-dec">&Delta;EC</div><div class="mv" id="m-dec">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindPresets, initTools } = ICS;
+
+const defaults = { p1: 10, p2: 5, al: 10, be: 1 };
+const state    = Object.assign({}, defaults);
+
+const presets = {
+  a: { al: 10, be: 1, p1: 10, p2: 5 },
+  b: { al: 10, be: 1, p1: 5,  p2: 3 }
+};
+
+const format = { p1: v => v.toFixed(1), p2: v => v.toFixed(1),
+                 al: v => v.toFixed(0), be: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 380 });
+
+function render() {
+  const s = state;
+  const choke = s.al / s.be;                     // precio al que la demanda se hace cero
+  const P1 = Math.min(s.p1, choke), P2 = Math.min(s.p2, choke);
+  const Qd = p => Math.max(0, s.al - s.be * p);  // demanda como funcion del precio
+  const Pd = q => (s.al - q) / s.be;             // la misma recta, leida al reves
+
+  const q1 = Qd(P1), q2 = Qd(P2);
+  const bajo = Math.min(P1, P2), alto = Math.max(P1, P2);
+
+  const maxQ = s.al * 1.08, maxP = choke * 1.15;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad", "Precio", { skipP: [P1, P2], skipQ: [q1, q2] });
+
+  // franja entre los dos precios, a la izquierda de la demanda
+  plot.area([[0, alto], [Qd(alto), alto], [Qd(bajo), bajo], [0, bajo]], C.cs, C.csLine);
+
+  plot.curve(Pd, C.demand, { width: 2.4, to: s.al });
+
+  [[P1, "P₁"], [P2, "P₂"]].forEach(([p, t]) => {
+    plot.seg(0, p, Qd(p), p, C.policy, { width: 1.8 });
+    plot.seg(Qd(p), 0, Qd(p), p, C.muted, { dash: [4, 3], width: 1 });
+    plot.tickP(p, t, C.policy);
+  });
+  plot.tickQ(q1, "Q₁", C.txt);
+  plot.tickQ(q2, "Q₂", C.txt);
+
+  plot.label(s.al * 0.62, Pd(s.al * 0.62), "Demanda", C.demand, { dx: 6, dy: -8, box: true });
+  plot.label(Math.max(q1, q2) * 0.42, (bajo + alto) / 2, "ΔEC", C.csLine,
+    { bold: true, align: "center" });
+
+  // integral cerrada: alpha(P1 - P2) - beta(P1^2 - P2^2)/2
+  const dEC = s.al * (P1 - P2) - s.be * (P1 * P1 - P2 * P2) / 2;
+  const esNivel = Math.abs(P1 - choke) < 1e-9;
+
+  document.getElementById("m-q1").textContent    = fmt.n(q1);
+  document.getElementById("m-q2").textContent    = fmt.n(q2);
+  document.getElementById("m-choke").textContent = fmt.n(choke);
+  document.getElementById("m-dec").textContent   = fmt.n(dEC);
+  document.getElementById("l-dec").textContent   = esNivel
+    ? "EC al precio P₂ (integrando desde el precio de choque)"
+    : (dEC >= 0 ? "ΔEC — ganancia del consumidor" : "ΔEC — pérdida del consumidor");
+
+  document.getElementById("algebra").innerHTML =
+    '<div class="step">ΔEC = ∫ Q_D(P) dP  entre P₂ = ' + fmt.n(P2,1) + ' y P₁ = ' + fmt.n(P1,1) + '</div>' +
+    '<div class="step">     = α(P₁ − P₂) − β · (P₁² − P₂²)/2</div>' +
+    '<div class="step">     = ' + s.al + '·(' + fmt.n(P1,1) + ' − ' + fmt.n(P2,1) + ') − ' +
+      fmt.n(s.be,1) + '·(' + fmt.n(P1*P1) + ' − ' + fmt.n(P2*P2) + ')/2</div>' +
+    '<div class="step">     = ' + fmt.n(s.al * (P1 - P2)) + ' − ' +
+      fmt.n(s.be * (P1*P1 - P2*P2) / 2) + '  =  <span class="res">' + fmt.n(dEC) + '</span></div>';
+
+  document.getElementById("note").textContent = esNivel
+    ? "Con P₁ en el precio de choque (α/β = " + fmt.n(choke) + ") la integral entrega directamente el excedente del consumidor " +
+      "al precio P₂: se calcula como si el precio cayera desde el punto en que nadie compra hasta el precio de mercado."
+    : "El área sombreada es el cambio en el excedente cuando el precio pasa de P₁ a P₂. " +
+      "Para obtener el nivel del excedente y no solo su cambio, sube P₁ hasta el precio de choque α/β = " + fmt.n(choke) + ".";
+}
+
+bindSliders(state, render, format);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m04-delta-ec" });
+</script>
+</body>
+</html>

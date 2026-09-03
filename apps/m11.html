@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incidencia y método de la cuña — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Incidencia de un impuesto y m&eacute;todo de la cu&ntilde;a</h1>
+  <span>M11 &middot; Pol&iacute;ticas p&uacute;blicas</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="vendedores">Lo pagan los vendedores</button>
+    <button class="tab" data-tab="compradores">Lo pagan los compradores</button>
+    <button class="tab" data-tab="cuna">M&eacute;todo de la cu&ntilde;a</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle"></div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Demanda</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Oferta</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-policy)" stroke-width="2.5" stroke-dasharray="6 4"/></svg>Curva desplazada por el impuesto</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Impuesto</div>
+        <div class="sr"><div class="sh"><span class="sn">Impuesto por unidad (t)</span><span class="sv" id="v-t">4.0</span></div>
+          <input type="range" data-p="t" min="0" max="16" step="0.5" value="4"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Demanda &nbsp;P = a &minus; b&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (a)</span><span class="sv" id="v-a">20</span></div>
+          <input type="range" data-p="a" min="8" max="40" step="0.5" value="20"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (b)</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Oferta &nbsp;P = c + d&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (c)</span><span class="sv" id="v-c">2</span></div>
+          <input type="range" data-p="c" min="0" max="15" step="0.5" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (d)</span><span class="sv" id="v-d">1.0</span></div>
+          <input type="range" data-p="d" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Nuevo equilibrio &mdash; id&eacute;ntico en las tres pesta&ntilde;as</div>
+      <div class="metric"><div class="ml">Cantidad Q&prime;</div><div class="mv" id="m-q">&mdash;</div></div>
+      <div class="metric"><div class="ml">Precio que paga el comprador P<sub>D</sub></div><div class="mv" id="m-pd">&mdash;</div></div>
+      <div class="metric"><div class="ml">Precio que recibe el vendedor P<sub>S</sub></div><div class="mv" id="m-ps">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Reparto de la carga</div>
+      <div class="metric"><div class="ml">Sube el precio del comprador</div><div class="mv" id="m-cc">&mdash;</div></div>
+      <div class="metric"><div class="ml">Baja el precio del vendedor</div><div class="mv" id="m-cp">&mdash;</div></div>
+      <div class="metric"><div class="ml">Recaudaci&oacute;n t&middot;Q&prime;</div><div class="mv" id="m-rec">&mdash;</div></div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="mgroup-label" style="margin-bottom:8px">Quién soporta la carga</div>
+    <div class="stack" id="stack"></div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindTabs, stackBar, initTools } = ICS;
+
+const defaults = { t: 4, a: 20, b: 1, c: 2, d: 1, tab: "vendedores" };
+const state    = Object.assign({}, defaults);
+
+const format = { t: v => v.toFixed(1), a: v => v.toFixed(1), b: v => v.toFixed(1),
+                 c: v => v.toFixed(1), d: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 400 });
+
+function render() {
+  const s = state;
+  const D = q => s.a - s.b * q;
+  const S = q => s.c + s.d * q;
+  const Qeq = (s.a - s.c) / (s.b + s.d);
+  const Peq = D(Qeq);
+
+  // el impuesto no puede ser mayor que la brecha entre el tope de la demanda y el piso de la oferta
+  const t = Math.min(s.t, Math.max(0, s.a - s.c));
+  const Q1 = Math.max(0, (s.a - s.c - t) / (s.b + s.d));
+  const PD = s.a - s.b * Q1;          // lo que paga el comprador
+  const PS = PD - t;                  // lo que recibe el vendedor
+
+  const maxQ = Qeq * 2.2, maxP = (s.a + t) * 1.1;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad", "Precio", { skipP: [PD, PS, Peq], skipQ: [Q1, Qeq] });
+
+  const titulo = {
+    vendedores:  "Impuesto que envían los vendedores: la oferta se desplaza a la izquierda",
+    compradores: "Impuesto que envían los compradores: la demanda se desplaza a la izquierda",
+    cuna:        "Método de la cuña: ninguna curva se mueve, se abre una brecha de tamaño t"
+  };
+  document.getElementById("ptitle").textContent = titulo[s.tab];
+
+  // curva desplazada segun quien entrega el dinero al Estado
+  if (s.tab === "vendedores") {
+    plot.curve(q => s.c + t + s.d * q, C.policy, { width: 2.2, dash: [6, 4] });
+    plot.label(maxQ * 0.55, s.c + t + s.d * maxQ * 0.55, "S₂", C.policy, { dx: 5, dy: -6, box: true });
+  } else if (s.tab === "compradores") {
+    plot.curve(q => s.a - t - s.b * q, C.policy, { width: 2.2, dash: [6, 4], to: (s.a - t) / s.b });
+    plot.label(maxQ * 0.42, s.a - t - s.b * maxQ * 0.42, "D₂", C.policy, { dx: 5, dy: 14, box: true });
+  }
+
+  plot.curve(D, C.demand, { width: 2.4, to: s.a / s.b });
+  plot.curve(S, C.supply, { width: 2.4 });
+
+  // equilibrio sin impuesto, de referencia
+  plot.seg(Qeq, 0, Qeq, Peq, C.muted, { dash: [3, 3], width: 1 });
+  plot.seg(0, Peq, Qeq, Peq, C.muted, { dash: [3, 3], width: 1 });
+  plot.dot(Qeq, Peq, C.muted);
+  plot.label(Qeq, Peq, "A", C.muted, { dx: 7, dy: -6, bold: true });
+  plot.tickP(Peq, "P*", C.muted);
+  plot.tickQ(Qeq, "Q*", C.muted);
+
+  // nuevo equilibrio: la cantidad es la misma en los tres casos
+  plot.seg(Q1, 0, Q1, PD, C.muted, { dash: [4, 3], width: 1 });
+  plot.seg(0, PD, Q1, PD, C.muted, { dash: [4, 3], width: 1 });
+  plot.seg(0, PS, Q1, PS, C.muted, { dash: [4, 3], width: 1 });
+  plot.tickP(PD, "P_D", C.txt);
+  plot.tickP(PS, "P_S", C.txt);
+  plot.tickQ(Q1, "Q′", C.txt);
+
+  plot.dot(Q1, PD, C.txt);
+  plot.dot(Q1, PS, C.txt);
+  if (t > 0.01) plot.spanV(PS, PD, Q1, "Impuesto " + fmt.n(t), C.policy);
+
+  plot.label(maxQ * 0.88, Math.max(D(maxQ * 0.88), 0), "Demanda", C.demand, { dx: 4, dy: 13, align: "right", box: true });
+  plot.label(maxQ * 0.88, S(maxQ * 0.88), "Oferta", C.supply, { dx: 4, dy: -6, align: "right", box: true });
+
+  // numeros
+  const cc = PD - Peq, cp = Peq - PS;
+  document.getElementById("m-q").textContent   = fmt.n(Q1);
+  document.getElementById("m-pd").textContent  = fmt.n(PD);
+  document.getElementById("m-ps").textContent  = fmt.n(PS);
+  document.getElementById("m-cc").textContent  = "+" + fmt.n(cc);
+  document.getElementById("m-cp").textContent  = "−" + fmt.n(cp);
+  document.getElementById("m-rec").textContent = fmt.n(t * Q1);
+
+  stackBar("stack", [
+    [cc, C.demand, "Consumidores"],
+    [cp, C.supply, "Productores"]
+  ]);
+
+  const notas = {
+    vendedores:
+      "El impuesto le sube el costo al vendedor, así que la oferta se mueve a la izquierda. El precio de equilibrio sube a " +
+      fmt.n(PD) + ", pero el vendedor solo se queda con " + fmt.n(PS) + " porque debe enviar " + fmt.n(t) + " al Estado.",
+    compradores:
+      "El impuesto hace menos atractivo comprar, así que la demanda se mueve a la izquierda. El precio de equilibrio baja a " +
+      fmt.n(PS) + ", pero al comprador el bien le termina costando " + fmt.n(PD) + " sumando el impuesto.",
+    cuna:
+      "Lo único que hace un impuesto es separar el precio que paga el comprador del que recibe el vendedor, y esa cuña vale " +
+      fmt.n(t) + ". Cambia de pestaña: la cantidad Q′ y los dos precios son idénticos en los tres casos. " +
+      "Quién le envía el cheque al Estado es irrelevante para el efecto económico."
+  };
+  document.getElementById("note").textContent = notas[s.tab];
+}
+
+bindSliders(state, render, format);
+bindTabs(state, "tab", render);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m11-incidencia-cuna" });
+</script>
+</body>
+</html>

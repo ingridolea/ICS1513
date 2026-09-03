@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICS1513 — Apps interactivas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anaheim&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --purple:      #9B72CF;
+    --purple-dark: #7B4DB0;
+    --purple-dim:  #F3EDFB;
+    --bg:          #F7F5FB;
+    --surface:     #FFFFFF;
+    --border:      #E2D9F0;
+    --text:        #1A1A2E;
+    --muted:       #7A7A9A;
+    --font: "Anaheim", sans-serif;
+    --sidebar-w: 248px;
+    --header-h:   52px;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* HEADER */
+  header {
+    height: var(--header-h);
+    background: var(--purple);
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    gap: 14px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(100,60,180,0.2);
+  }
+  .logo {
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.75);
+    white-space: nowrap;
+  }
+  .logo-sep { width: 1px; height: 20px; background: rgba(255,255,255,0.28); }
+  header h1 { font-size: 0.98rem; font-weight: 400; color: #fff; letter-spacing: 0.02em; }
+
+  .header-btn {
+    margin-left: auto;
+    font-family: var(--font);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #fff;
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 5px;
+    padding: 6px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.14s;
+  }
+  .header-btn:hover { background: rgba(255,255,255,0.28); }
+
+  /* LAYOUT */
+  .layout { display: flex; flex: 1; overflow: hidden; }
+
+  /* SIDEBAR */
+  aside {
+    width: var(--sidebar-w);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+
+  .sidebar-section {
+    padding: 12px 14px 8px;
+    font-size: 0.64rem;
+    font-weight: 500;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--purple);
+    background: var(--purple-dim);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .app-item {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 13px 14px;
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    transition: background 0.14s;
+    text-align: left;
+    background: none;
+    border-top: none;
+    border-right: none;
+    width: 100%;
+    font-family: var(--font);
+  }
+  .app-item:hover { background: var(--purple-dim); }
+  .app-item.active {
+    background: var(--purple-dim);
+    border-left-color: var(--purple);
+  }
+  .app-unit {
+    font-size: 0.63rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--purple);
+  }
+  .app-name {
+    font-size: 0.88rem;
+    color: var(--text);
+    line-height: 1.3;
+  }
+  .app-desc {
+    font-size: 0.71rem;
+    color: var(--muted);
+    line-height: 1.4;
+    margin-top: 2px;
+  }
+
+  .app-item.pending .app-name,
+  .app-item.pending .app-desc { color: var(--muted); }
+  .app-item.pending .app-unit { color: #B9A6D4; }
+  .pill {
+    display: inline-block;
+    font-size: 0.56rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--purple-dark);
+    background: var(--purple-dim);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+
+  .sidebar-footer {
+    margin-top: auto;
+    padding: 14px;
+    font-size: 0.67rem;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    line-height: 1.7;
+  }
+
+  /* MAIN */
+  main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  .app-bar {
+    padding: 9px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-shrink: 0;
+    min-height: 36px;
+  }
+  .current-unit {
+    font-size: 0.68rem;
+    color: var(--purple);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .current-name { font-size: 0.92rem; color: var(--text); }
+
+  .nav-group { margin-left: auto; display: flex; gap: 6px; align-self: center; }
+  .nav-btn {
+    font-family: var(--font);
+    font-size: 0.8rem;
+    line-height: 1;
+    color: var(--purple-dark);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: background 0.14s;
+  }
+  .nav-btn:hover:not(:disabled) { background: var(--purple-dim); }
+  .nav-btn:disabled { color: #CFC6DE; cursor: default; }
+
+  .frame-wrap { flex: 1; overflow: hidden; background: #fff; position: relative; }
+
+  iframe { width: 100%; height: 100%; border: none; display: block; }
+
+  .empty-state {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px; color: var(--muted);
+    text-align: center;
+    padding: 0 32px;
+  }
+  .empty-icon {
+    width: 52px; height: 52px;
+    border-radius: 14px;
+    background: var(--purple-dim);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+  }
+  .empty-state p { font-size: 0.88rem; }
+  .empty-state .sub { font-size: 0.75rem; max-width: 34ch; line-height: 1.6; }
+
+  /* MODO PRESENTACION */
+  body.present aside,
+  body.present .app-bar { display: none; }
+  body.present .frame-wrap { background: #fff; }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">ICS1513</span>
+  <div class="logo-sep"></div>
+  <h1>Introducci&oacute;n a la Econom&iacute;a &mdash; Apps interactivas</h1>
+  <button class="header-btn" id="present-btn" onclick="togglePresent()">Modo presentaci&oacute;n</button>
+</header>
+
+<div class="layout">
+  <aside id="sidebar"></aside>
+
+  <main>
+    <div class="app-bar">
+      <span class="current-unit" id="cur-unit"></span>
+      <span class="current-name" id="cur-name"></span>
+      <div class="nav-group">
+        <button class="nav-btn" id="prev-btn" onclick="step(-1)" title="M&oacute;dulo anterior">&lsaquo;</button>
+        <button class="nav-btn" id="next-btn" onclick="step(1)" title="M&oacute;dulo siguiente">&rsaquo;</button>
+      </div>
+    </div>
+
+    <div class="frame-wrap">
+      <div class="empty-state" id="empty">
+        <div class="empty-icon">&#128202;</div>
+        <p id="empty-msg">Selecciona un m&oacute;dulo del panel izquierdo</p>
+        <p class="sub" id="empty-sub"></p>
+      </div>
+      <iframe id="frame" style="display:none" title="M&oacute;dulo interactivo"></iframe>
+    </div>
+  </main>
+</div>
+
+<script>
+  // Cada modulo vive en apps/<id>.html y se carga en el iframe.
+  const SECTIONS = [
+    { title: "Excedente del consumidor", apps: [
+      { id:"m01", unit:"M1 · Eficiencia de mercado", name:"Demanda escalonada y disposición a pagar",
+        desc:"Las 4 compradoras del ejemplo Madonna, con excedentes por persona", file:"apps/m01.html" },
+      { id:"m02", unit:"M2 · Eficiencia de mercado", name:"De la escalera a la curva continua",
+        desc:"De 4 a 200 compradores: por qué aparece la integral", file:"apps/m02.html" },
+      { id:"m03", unit:"M3 · Eficiencia de mercado", name:"Variación del EC: rectángulo R y triángulo T",
+        desc:"Pérdida por mayor costo y por menor consumo", file:"apps/m03.html" },
+      { id:"m04", unit:"M4 · Eficiencia de mercado", name:"Cálculo de ΔEC con demanda lineal",
+        desc:"Integral desarrollada en vivo sobre Q = 10 − P", file:"apps/m04.html" }
+    ]},
+    { title: "Excedente del productor", apps: [
+      { id:"m05", unit:"M5 · Eficiencia de mercado", name:"Oferta escalonada y costo de oportunidad",
+        desc:"Los 4 pintores, con excedentes por vendedor", file:"apps/m05.html" },
+      { id:"m06", unit:"M6 · Eficiencia de mercado", name:"EP continuo y su variación",
+        desc:"Ganancia por mayor precio y por más comercio", file:"apps/m06.html" }
+    ]},
+    { title: "Equilibrio y eficiencia", apps: [
+      { id:"m07", unit:"M7 · Eficiencia de mercado", name:"Equilibrio, EC + EP y excedente total",
+        desc:"El gráfico base: sliders de oferta y demanda con áreas", file:"apps/m07.html" },
+      { id:"m08", unit:"M8 · Eficiencia de mercado", name:"¿Por qué el equilibrio es eficiente?",
+        desc:"Forzar Q distinto de Q* y ver la pérdida de excedente", file:"apps/m08.html" }
+    ]},
+    { title: "Control de precios", apps: [
+      { id:"m09", unit:"M9 · Políticas públicas", name:"Techo de precios",
+        desc:"Escasez, bienestar y el caso de los arriendos a corto y largo plazo", file:"apps/m09.html" },
+      { id:"m10", unit:"M10 · Políticas públicas", name:"Precio mínimo y salario mínimo",
+        desc:"Sobreoferta, desempleo y el sueldo mínimo chileno", file:"apps/m10.html" }
+    ]},
+    { title: "Impuestos", apps: [
+      { id:"m11", unit:"M11 · Políticas públicas", name:"Incidencia y método de la cuña",
+        desc:"Vendedores, compradores y la cuña dan el mismo resultado", file:"apps/m11.html" },
+      { id:"m12", unit:"M12 · Políticas públicas", name:"Elasticidad e incidencia tributaria",
+        desc:"Quién carga con el impuesto según las elasticidades", file:"apps/m12.html" },
+      { id:"m13", unit:"M13 · Políticas públicas", name:"Bienestar con impuesto",
+        desc:"Áreas A–F, recaudación y pérdida social con tabla", file:"apps/m13.html" },
+      { id:"m14", unit:"M14 · Políticas públicas", name:"Tamaño del impuesto y curva de Laffer",
+        desc:"Mercado y trayectorias de bienestar en función de t", file:"apps/m14.html" }
+    ]},
+    { title: "Subsidios", apps: [
+      { id:"m15", unit:"M15 · Políticas públicas", name:"Subsidio: excedentes y gasto fiscal",
+        desc:"Cuña invertida, tabla A–G y caída del excedente total", file:"apps/m15.html" }
+    ]},
+    { title: "Ejercicios", apps: [
+      { id:"m16", unit:"M16 · Políticas públicas", name:"Ejercicio propuesto no lineal",
+        desc:"Qs = √(10P) − 1 y Qd = (100 − P)/P, con impuesto t = 5", file:"apps/m16.html" }
+    ]},
+    { title: "Fallas de mercado", apps: [
+      { id:"m17", unit:"M17 · Unidad 3 · Monopolio", name:"Excedentes y bienestar",
+        desc:"Oferta, demanda, impuestos y externalidades con sliders", file:"apps/m17.html" },
+      { id:"m18", unit:"M18 · Unidad 4 · Oligopolio", name:"Cártel, desvío y Nash",
+        desc:"Superposición de escenarios con toggles", file:"apps/m18.html" }
+    ]}
+  ];
+
+  const APPS = SECTIONS.flatMap(s => s.apps);
+  let current = -1;
+
+  // --- Sidebar ---
+  const aside = document.getElementById("sidebar");
+  SECTIONS.forEach(sec => {
+    const h = document.createElement("div");
+    h.className = "sidebar-section";
+    h.textContent = sec.title;
+    aside.appendChild(h);
+
+    sec.apps.forEach(app => {
+      const idx = APPS.indexOf(app);
+      const b = document.createElement("button");
+      b.className = "app-item" + (app.file ? "" : " pending");
+      b.id = "btn-" + idx;
+      b.onclick = () => load(idx);
+      b.innerHTML =
+        '<span class="app-unit">' + app.unit + '</span>' +
+        '<span class="app-name">' + app.name +
+          (app.file ? '' : '<span class="pill">pronto</span>') + '</span>' +
+        '<span class="app-desc">' + app.desc + '</span>';
+      aside.appendChild(b);
+    });
+  });
+  const foot = document.createElement("div");
+  foot.className = "sidebar-footer";
+  foot.innerHTML = "ICS1513 &middot; Ingenier&iacute;a UC<br>Ingrid Olea";
+  aside.appendChild(foot);
+
+  // --- Carga de modulos ---
+  function load(idx, skipHash) {
+    const app = APPS[idx];
+    if (!app) return;
+    current = idx;
+
+    document.querySelectorAll(".app-item").forEach((b, i) =>
+      b.classList.toggle("active", i === idx));
+
+    document.getElementById("cur-unit").textContent = app.unit;
+    document.getElementById("cur-name").textContent = app.name;
+    document.getElementById("prev-btn").disabled = idx === 0;
+    document.getElementById("next-btn").disabled = idx === APPS.length - 1;
+
+    const frame = document.getElementById("frame");
+    const empty = document.getElementById("empty");
+
+    if (app.file) {
+      empty.style.display = "none";
+      frame.style.display = "block";
+      frame.src = app.file;
+    } else {
+      frame.style.display = "none";
+      frame.removeAttribute("src");
+      empty.style.display = "flex";
+      document.getElementById("empty-msg").textContent = "Módulo en construcción";
+      document.getElementById("empty-sub").textContent = app.name + " — " + app.desc + ".";
+    }
+
+    if (!skipHash) history.replaceState(null, "", "#" + app.id);
+    aside.querySelector("#btn-" + idx)
+         .scrollIntoView({ block: "nearest" });
+  }
+
+  function step(d) {
+    const i = current < 0 ? 0 : current + d;
+    if (i >= 0 && i < APPS.length) load(i);
+  }
+
+  // --- Modo presentacion ---
+  function togglePresent() {
+    const on = document.body.classList.toggle("present");
+    document.getElementById("present-btn").textContent =
+      on ? "Salir (Esc)" : "Modo presentación";
+  }
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape" && document.body.classList.contains("present")) togglePresent();
+    if (e.target.tagName === "INPUT") return;
+    if (e.key === "ArrowRight") step(1);
+    if (e.key === "ArrowLeft")  step(-1);
+  });
+
+  // --- Ancla inicial ---
+  const hash = location.hash.replace("#", "");
+  const start = APPS.findIndex(a => a.id === hash);
+  if (start >= 0) {
+    load(start, true);
+  } else {
+    document.getElementById("empty-sub").textContent =
+      "Cada módulo queda linkeable con su ancla, por ejemplo #m07, para saltar desde la diapositiva.";
+    document.getElementById("prev-btn").disabled = true;
+  }
+</script>
+</body>
+</html>

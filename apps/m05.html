@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oferta escalonada y costo de oportunidad — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Oferta escalonada y costo de oportunidad</h1>
+  <span>M5 &middot; Eficiencia de mercado</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="licitacion">Licitaci&oacute;n</button>
+    <button class="tab" data-tab="precio">Precio dado</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title">Curva de oferta del servicio de pintura</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Oferta (costo de cada pintor)</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-policy)" stroke-width="2.5"/></svg>Precio del servicio</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-ps)"></span>Excedente del productor</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders">
+      <div class="slider-group">
+        <div class="group-label">Costo de pintar una casa</div>
+        <div class="sr"><div class="sh"><span class="sn">Vincent</span><span class="sv" id="v-c1">$900.000</span></div>
+          <input type="range" data-p="c1" min="100" max="1200" step="50" value="900"></div>
+        <div class="sr"><div class="sh"><span class="sn">Frida</span><span class="sv" id="v-c2">$800.000</span></div>
+          <input type="range" data-p="c2" min="100" max="1200" step="50" value="800"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Costo de pintar una casa</div>
+        <div class="sr"><div class="sh"><span class="sn">Pablo</span><span class="sv" id="v-c3">$600.000</span></div>
+          <input type="range" data-p="c3" min="100" max="1200" step="50" value="600"></div>
+        <div class="sr"><div class="sh"><span class="sn">Artemisa</span><span class="sv" id="v-c4">$500.000</span></div>
+          <input type="range" data-p="c4" min="100" max="1200" step="50" value="500"></div>
+      </div>
+      <div class="slider-group wide" id="g-licitacion">
+        <hr class="divider">
+        <div class="group-label">Licitaci&oacute;n</div>
+        <div class="sr"><div class="sh"><span class="sn">Casas por pintar &mdash; el precio baja mientras los pintores compiten</span><span class="sv" id="v-k">1</span></div>
+          <input type="range" data-p="k" min="1" max="4" step="1" value="1"></div>
+      </div>
+      <div class="slider-group wide" id="g-precio">
+        <hr class="divider">
+        <div class="group-label">Precio del servicio</div>
+        <div class="sr"><div class="sh"><span class="sn">Precio por pintar una casa</span><span class="sv" id="v-p">$600.000</span></div>
+          <input type="range" data-p="p" min="0" max="1300" step="50" value="600"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="wtable" id="tabla">
+      <thead><tr><th>Pintor</th><th>Costo</th><th>&iquest;Trabaja?</th><th>Recibe</th><th>Excedente</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup">
+      <div class="mgroup-label">Mercado</div>
+      <div class="metric"><div class="ml">Precio</div><div class="mv" id="m-precio">&mdash;</div></div>
+      <div class="metric"><div class="ml">Casas pintadas</div><div class="mv" id="m-q">&mdash;</div></div>
+    </div>
+    <div class="mgroup">
+      <div class="mgroup-label">Bienestar</div>
+      <div class="metric"><div class="ml">Excedente del productor</div><div class="mv" id="m-ep">&mdash;</div></div>
+      <div class="metric"><div class="ml">Vendedor marginal</div><div class="mv" id="m-marg">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, bindSliders, bindTabs, initTools } = ICS;
+
+const NOMBRES = ["Vincent", "Frida", "Pablo", "Artemisa"];
+
+const defaults = { c1: 900, c2: 800, c3: 600, c4: 500, k: 1, p: 600, tab: "licitacion" };
+const state    = Object.assign({}, defaults);
+
+const plata  = v => "$" + (v * 1000).toLocaleString("es-CL");
+const format = { c1: plata, c2: plata, c3: plata, c4: plata, p: plata, k: v => v };
+
+const plot = new Plot("c-main", { height: 360 });
+
+function render() {
+  const s = state;
+  document.getElementById("g-licitacion").style.display = s.tab === "licitacion" ? "" : "none";
+  document.getElementById("g-precio").style.display     = s.tab === "precio"     ? "" : "none";
+
+  // pintores ordenados de menor a mayor costo: la curva de oferta
+  const gente = [s.c1, s.c2, s.c3, s.c4]
+    .map((c, i) => ({ nombre: NOMBRES[i], c }))
+    .sort((x, y) => x.c - y.c);
+  const costos = gente.map(g => g.c);
+
+  // en la licitacion el precio lo fija el primer pintor que queda fuera
+  let precio, qContratados;
+  if (s.tab === "licitacion") {
+    qContratados = s.k;
+    precio = s.k < 4 ? costos[s.k] : costos[3] * 1.2;
+  } else {
+    precio = s.p;
+    qContratados = costos.filter(c => c <= precio).length;
+  }
+  const trabajan = Math.min(qContratados, costos.filter(c => c <= precio).length);
+
+  const maxP = Math.max(...costos, precio) * 1.3;
+  plot.begin(5, maxP).grid()
+      .axes("Cantidad de casas pintadas", "Precio de pintar casa", { noP: true, noQ: true });
+  [1, 2, 3, 4].forEach(q => plot.tickQ(q, String(q), C.muted));
+  costos.forEach(c => plot.tickP(c, plata(c), C.muted));
+
+  for (let i = 0; i < trabajan; i++)
+    plot.rect(i, costos[i], i + 1, precio, C.ps, C.psLine);
+
+  plot.steps(costos, C.supply, { asc: true, top: maxP });
+
+  plot.seg(0, precio, 5, precio, C.policy, { width: 2 });
+  plot.tickP(precio, plata(precio), C.policy);
+
+  gente.forEach((g, i) =>
+    plot.label(i + 0.5, costos[i], g.nombre, C.supply,
+      { dy: -7, align: "center", box: true }));
+  plot.label(4, maxP * 0.9, "Oferta", C.supply, { dx: 8, box: true });
+
+  const EP = gente.slice(0, trabajan).reduce((t, g) => t + (precio - g.c), 0);
+  document.querySelector("#tabla tbody").innerHTML = gente.map((g, i) => {
+    const si = i < trabajan;
+    return "<tr><td>" + g.nombre + "</td><td>" + plata(g.c) + "</td><td>" +
+      (si ? "sí" : "no") + "</td><td>" + (si ? plata(precio) : "—") + "</td>" +
+      '<td class="' + (si && precio > g.c ? "pos" : "") + '">' +
+      (si ? plata(precio - g.c) : "—") + "</td></tr>";
+  }).join("");
+
+  document.getElementById("m-precio").textContent = plata(precio);
+  document.getElementById("m-q").textContent = trabajan + (trabajan === 1 ? " casa" : " casas");
+  document.getElementById("m-ep").textContent = plata(EP);
+  document.getElementById("m-marg").textContent =
+    trabajan > 0 ? gente[trabajan - 1].nombre : "ninguno";
+
+  const nota = document.getElementById("note");
+  if (s.tab === "licitacion") {
+    nota.textContent = s.k < 4
+      ? "Con " + s.k + (s.k === 1 ? " casa" : " casas") + " por pintar, las ofertas bajan hasta apenas por debajo de " +
+        plata(costos[s.k]) + ": es el costo de " + gente[s.k].nombre + ", el primero que se retira. " +
+        "Los que sí trabajan ganan la diferencia entre lo que reciben y lo que les cuesta el trabajo."
+      : "Con trabajo para los cuatro ya nadie compite por bajar el precio, así que este sube y el excedente del productor es el mayor posible.";
+  } else {
+    nota.textContent = "A este precio aceptan el trabajo los " + trabajan +
+      " pintores cuyo costo no supera " + plata(precio) +
+      ". La curva de oferta son esos costos ordenados de menor a mayor: a cada cantidad muestra el costo del vendedor marginal.";
+  }
+}
+
+bindSliders(state, render, format);
+bindTabs(state, "tab", render);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m05-oferta-escalonada" });
+</script>
+</body>
+</html>

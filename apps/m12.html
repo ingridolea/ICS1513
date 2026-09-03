@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Elasticidad e incidencia tributaria — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Elasticidad e incidencia de un impuesto</h1>
+  <span>M12 &middot; Pol&iacute;ticas p&uacute;blicas</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tool-btn" data-preset="di_oe">Demanda inel&aacute;stica / oferta el&aacute;stica</button>
+    <button class="tool-btn" data-preset="de_oi">Demanda el&aacute;stica / oferta inel&aacute;stica</button>
+    <button class="tool-btn" data-preset="renta">Impuesto a la renta</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Mercado con impuesto</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <div class="mgroup-label" style="margin-bottom:8px">Reparto de la carga tributaria</div>
+    <div class="stack" id="stack"></div>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Impuesto</div>
+        <div class="sr"><div class="sh"><span class="sn">Impuesto por unidad (t)</span><span class="sv" id="v-t">4.0</span></div>
+          <input type="range" data-p="t" min="0" max="14" step="0.5" value="4"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label" id="gl-d">Demanda</div>
+        <div class="sr"><div class="sh"><span class="sn" id="sn-b">Pendiente (b): &larr; el&aacute;stica &nbsp;&middot;&nbsp; inel&aacute;stica &rarr;</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.2" max="4" step="0.1" value="1"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label" id="gl-s">Oferta</div>
+        <div class="sr"><div class="sh"><span class="sn" id="sn-d">Pendiente (d): &larr; el&aacute;stica &nbsp;&middot;&nbsp; inel&aacute;stica &rarr;</span><span class="sv" id="v-d">1.0</span></div>
+          <input type="range" data-p="d" min="0.2" max="4" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Precios</div>
+      <div class="metric"><div class="ml" id="ml-pd">Paga el comprador P<sub>D</sub></div><div class="mv" id="m-pd">&mdash;</div></div>
+      <div class="metric"><div class="ml">Sin impuesto P*</div><div class="mv" id="m-peq">&mdash;</div></div>
+      <div class="metric"><div class="ml" id="ml-ps">Recibe el vendedor P<sub>S</sub></div><div class="mv" id="m-ps">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Incidencia</div>
+      <div class="metric"><div class="ml" id="ml-cc">Carga del comprador</div><div class="mv" id="m-cc">&mdash;</div></div>
+      <div class="metric"><div class="ml" id="ml-cp">Carga del vendedor</div><div class="mv" id="m-cp">&mdash;</div></div>
+      <div class="metric"><div class="ml">Recaudaci&oacute;n</div><div class="mv" id="m-rec">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindPresets, stackBar, initTools } = ICS;
+
+// a y c se mantienen fijos: solo cambian las pendientes, es decir, las elasticidades
+const defaults = { t: 4, b: 1, d: 1, a: 20, c: 2, marco: "bien" };
+const state    = Object.assign({}, defaults);
+
+const presets = {
+  di_oe: { b: 3,   d: 0.4, t: 4, marco: "bien" },
+  de_oi: { b: 0.4, d: 3,   t: 4, marco: "bien" },
+  renta: { b: 0.4, d: 3,   t: 4, marco: "laboral" }
+};
+
+const format = { t: v => v.toFixed(1), b: v => v.toFixed(1), d: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 380 });
+
+function render() {
+  const s = state;
+  const lab = s.marco === "laboral";
+  const D = q => s.a - s.b * q;
+  const S = q => s.c + s.d * q;
+  const Qeq = (s.a - s.c) / (s.b + s.d);
+  const Peq = D(Qeq);
+
+  const t = Math.min(s.t, Math.max(0, s.a - s.c));
+  const Q1 = Math.max(0, (s.a - s.c - t) / (s.b + s.d));
+  const PD = s.a - s.b * Q1;
+  const PS = PD - t;
+  const cc = PD - Peq, cp = Peq - PS;
+
+  // rotulos segun el marco
+  document.getElementById("gl-d").textContent = lab ? "Demanda de mano de obra (empresas)" : "Demanda";
+  document.getElementById("gl-s").textContent = lab ? "Oferta de mano de obra (trabajadores)" : "Oferta";
+  document.getElementById("ml-pd").innerHTML = lab ? "Salario pagado por la empresa" : "Paga el comprador P<sub>D</sub>";
+  document.getElementById("ml-ps").innerHTML = lab ? "Salario recibido por el trabajador" : "Recibe el vendedor P<sub>S</sub>";
+  document.getElementById("ml-cc").textContent = lab ? "Carga de las empresas" : "Carga del comprador";
+  document.getElementById("ml-cp").textContent = lab ? "Carga de los trabajadores" : "Carga del vendedor";
+  document.getElementById("ptitle").textContent = lab
+    ? "Impuesto a la renta en el mercado de mano de obra"
+    : "Mercado con impuesto de t por unidad";
+
+  const maxQ = Qeq * 2.1, maxP = s.a * 1.12;
+  plot.begin(maxQ, maxP).grid()
+      .axes(lab ? "Cantidad de mano de obra" : "Cantidad", lab ? "Salario" : "Precio",
+            { skipP: [PD, PS, Peq], skipQ: [Q1, Qeq] });
+
+  plot.curve(D, C.demand, { width: 2.4, to: s.a / s.b });
+  plot.curve(S, C.supply, { width: 2.4 });
+
+  plot.seg(Qeq, 0, Qeq, Peq, C.muted, { dash: [3, 3], width: 1 });
+  plot.dot(Qeq, Peq, C.muted);
+  plot.tickP(Peq, lab ? "W*" : "P*", C.muted);
+
+  plot.seg(0, PD, Q1, PD, C.muted, { dash: [4, 3], width: 1 });
+  plot.seg(0, PS, Q1, PS, C.muted, { dash: [4, 3], width: 1 });
+  plot.seg(Q1, 0, Q1, PD, C.muted, { dash: [4, 3], width: 1 });
+  plot.tickP(PD, "P_D", C.txt);
+  plot.tickP(PS, "P_S", C.txt);
+  plot.tickQ(Q1, "Q′", C.txt);
+  plot.dot(Q1, PD, C.txt);
+  plot.dot(Q1, PS, C.txt);
+  if (t > 0.01) plot.spanV(PS, PD, Q1, "Impuesto " + fmt.n(t), C.policy);
+
+  plot.label(maxQ * 0.86, Math.max(D(maxQ * 0.86), 0),
+    lab ? "Demanda mano de obra" : "Demanda", C.demand, { dx: 4, dy: 13, align: "right", box: true });
+  plot.label(maxQ * 0.86, S(maxQ * 0.86),
+    lab ? "Oferta mano de obra" : "Oferta", C.supply, { dx: 4, dy: -6, align: "right", box: true });
+
+  document.getElementById("m-pd").textContent  = fmt.n(PD);
+  document.getElementById("m-peq").textContent = fmt.n(Peq);
+  document.getElementById("m-ps").textContent  = fmt.n(PS);
+  document.getElementById("m-cc").textContent  = fmt.n(cc) + (t > 0 ? "  (" + (100 * cc / t).toFixed(0) + "%)" : "");
+  document.getElementById("m-cp").textContent  = fmt.n(cp) + (t > 0 ? "  (" + (100 * cp / t).toFixed(0) + "%)" : "");
+  document.getElementById("m-rec").textContent = fmt.n(t * Q1);
+
+  stackBar("stack", [
+    [Math.max(cc, 0), C.demand, lab ? "Empresas" : "Consumidores"],
+    [Math.max(cp, 0), C.supply, lab ? "Trabajadores" : "Productores"]
+  ]);
+
+  // con curvas lineales el reparto solo depende de las pendientes
+  document.getElementById("algebra").innerHTML =
+    '<div class="step">Carga del comprador / t  =  b / (b + d)  =  ' + fmt.n(s.b,1) + ' / (' +
+      fmt.n(s.b,1) + ' + ' + fmt.n(s.d,1) + ')  =  <span class="res">' +
+      (100 * s.b / (s.b + s.d)).toFixed(0) + '%</span></div>' +
+    '<div class="step">Carga del vendedor  / t  =  d / (b + d)  =  ' + fmt.n(s.d,1) + ' / (' +
+      fmt.n(s.b,1) + ' + ' + fmt.n(s.d,1) + ')  =  <span class="res">' +
+      (100 * s.d / (s.b + s.d)).toFixed(0) + '%</span></div>';
+
+  const nota = document.getElementById("note");
+  if (lab) {
+    nota.textContent =
+      "Los economistas creen que la oferta de mano de obra es más inelástica que la demanda: la gente sigue trabajando aunque " +
+      "el sueldo líquido baje. Por eso el salario que reciben los trabajadores cae bastante (" + fmt.n(cp) +
+      ") mientras el costo para la empresa sube poco (" + fmt.n(cc) + "): la carga del impuesto a la renta la llevan sobre todo " +
+      "los trabajadores, sin importar que la empresa sea la que retiene y entera el impuesto.";
+  } else if (s.b > s.d * 1.2) {
+    nota.textContent =
+      "La demanda es más inelástica que la oferta: los compradores no tienen cómo escaparse del impuesto y absorben el " +
+      (100 * cc / (t || 1)).toFixed(0) + "% de la carga. El grupo con la curva más inelástica siempre soporta la mayor parte.";
+  } else if (s.d > s.b * 1.2) {
+    nota.textContent =
+      "La oferta es más inelástica que la demanda: son los productores los que no pueden escaparse y cargan con el " +
+      (100 * cp / (t || 1)).toFixed(0) + "% del impuesto, aunque el precio que pagan los consumidores casi no se mueva.";
+  } else {
+    nota.textContent =
+      "Con elasticidades parecidas la carga se reparte casi en partes iguales. Mueve las pendientes: el lado que menos puede " +
+      "cambiar su cantidad —el más inelástico— es el que termina pagando más.";
+  }
+}
+
+bindSliders(state, render, format);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m12-elasticidad-incidencia" });
+</script>
+</body>
+</html>

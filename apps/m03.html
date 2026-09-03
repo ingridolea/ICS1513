@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Variación del EC: rectángulo R y triángulo T — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Variaci&oacute;n del excedente del consumidor: rect&aacute;ngulo R y tri&aacute;ngulo T</h1>
+  <span>M3 &middot; Eficiencia de mercado</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="chip" data-layer="R"><span class="dot" style="background:var(--c-transfer)"></span>Rect&aacute;ngulo R &mdash; p&eacute;rdida por mayor costo</button>
+    <button class="chip" data-layer="T"><span class="dot" style="background:var(--c-dwl)"></span>Tri&aacute;ngulo T &mdash; p&eacute;rdida por menor consumo</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title">El precio sube de p&prime; a p&Prime;</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Curva de demanda</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-transfer)"></span>R = (p&Prime; &minus; p&prime;) &middot; x&Prime;</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-dwl)"></span>T = &frac12; (p&Prime; &minus; p&prime;)(x&prime; &minus; x&Prime;)</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders">
+      <div class="slider-group">
+        <div class="group-label">Precios</div>
+        <div class="sr"><div class="sh"><span class="sn">Precio inicial p&prime;</span><span class="sv" id="v-p1">6.0</span></div>
+          <input type="range" data-p="p1" min="0.5" max="18" step="0.5" value="6"></div>
+        <div class="sr"><div class="sh"><span class="sn">Precio final p&Prime;</span><span class="sv" id="v-p2">12.0</span></div>
+          <input type="range" data-p="p2" min="0.5" max="18" step="0.5" value="12"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Demanda &nbsp;P = a &minus; b&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (a)</span><span class="sv" id="v-a">20</span></div>
+          <input type="range" data-p="a" min="10" max="40" step="1" value="20"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (b)</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.5" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">P&eacute;rdida de bienestar del consumidor</div>
+      <div class="metric"><div class="ml">Rect&aacute;ngulo R</div><div class="mv" id="m-r">&mdash;</div></div>
+      <div class="metric"><div class="ml">Tri&aacute;ngulo T</div><div class="mv" id="m-t">&mdash;</div></div>
+      <div class="metric"><div class="ml">P&eacute;rdida total R + T</div><div class="mv" id="m-tot">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Cantidades</div>
+      <div class="metric"><div class="ml">x&prime; a precio p&prime;</div><div class="mv" id="m-x1">&mdash;</div></div>
+      <div class="metric"><div class="ml">x&Prime; a precio p&Prime;</div><div class="mv" id="m-x2">&mdash;</div></div>
+      <div class="metric"><div class="ml">Unidades que deja de comprar</div><div class="mv" id="m-dx">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, initTools } = ICS;
+
+const defaults = { p1: 6, p2: 12, a: 20, b: 1 };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { R: true, T: true };
+const layers        = Object.assign({}, layerDefaults);
+
+const format = { p1: v => v.toFixed(1), p2: v => v.toFixed(1),
+                 a: v => v.toFixed(0), b: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 380 });
+
+function render() {
+  const s = state;
+  const D = q => s.a - s.b * q;
+  const Q = p => Math.max(0, (s.a - p) / s.b);
+
+  // el precio bajo siempre es p', el alto p'', sin importar como quedaron los sliders
+  const pLo = Math.min(s.p1, s.p2), pHi = Math.max(s.p1, s.p2);
+  const subio = s.p2 >= s.p1;
+  const x1 = Q(pLo), x2 = Q(pHi);          // x' y x''
+
+  const maxQ = (s.a / s.b) * 1.06, maxP = s.a * 1.15;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad", "Precio", { skipP: [pLo, pHi], skipQ: [x1, x2] });
+
+  if (layers.R) plot.rect(0, pLo, x2, pHi, C.transfer, C.muted);
+  if (layers.T) plot.area([[x2, pHi], [x2, pLo], [x1, pLo]], C.dwl, C.dwlLine);
+
+  plot.curve(D, C.demand, { width: 2.4, to: s.a / s.b });
+
+  plot.seg(0, pLo, x1, pLo, C.muted, { dash: [4, 3], width: 1 });
+  plot.seg(0, pHi, x2, pHi, C.muted, { dash: [4, 3], width: 1 });
+  plot.seg(x1, 0, x1, pLo, C.muted, { dash: [4, 3], width: 1 });
+  plot.seg(x2, 0, x2, pHi, C.muted, { dash: [4, 3], width: 1 });
+
+  plot.tickP(pLo, "p′", C.txt);
+  plot.tickP(pHi, "p″", C.txt);
+  plot.tickQ(x1, "x′", C.txt);
+  plot.tickQ(x2, "x″", C.txt);
+
+  if (layers.R && x2 > 0)
+    plot.label(x2 / 2, (pLo + pHi) / 2, "R", C.txt, { bold: true, align: "center" });
+  if (layers.T && x1 > x2)
+    plot.label(x2 + (x1 - x2) / 3, pLo + (pHi - pLo) / 3, "T", C.dwlLine,
+      { bold: true, align: "center" });
+
+  plot.label(maxQ * 0.72, D(maxQ * 0.72), "Demanda", C.demand, { dx: 6, dy: -8, box: true });
+  plot.spanV(pLo, pHi, maxQ * 0.97, "", C.policy);
+
+  const R = (pHi - pLo) * x2;
+  const T = 0.5 * (pHi - pLo) * (x1 - x2);
+
+  document.getElementById("m-r").textContent   = fmt.n(R);
+  document.getElementById("m-t").textContent   = fmt.n(T);
+  document.getElementById("m-tot").textContent = fmt.n(R + T);
+  document.getElementById("m-x1").textContent  = fmt.n(x1);
+  document.getElementById("m-x2").textContent  = fmt.n(x2);
+  document.getElementById("m-dx").textContent  = fmt.n(x1 - x2);
+
+  document.getElementById("algebra").innerHTML =
+    '<div class="step">x′ = (a − p′)/b = (' + s.a + ' − ' + fmt.n(pLo,1) + ')/' + fmt.n(s.b,1) +
+      ' = <span class="res">' + fmt.n(x1) + '</span>   ' +
+      'x″ = (a − p″)/b = <span class="res">' + fmt.n(x2) + '</span></div>' +
+    '<div class="step">R = (p″ − p′) · x″ = ' + fmt.n(pHi - pLo) + ' · ' + fmt.n(x2) +
+      ' = <span class="res">' + fmt.n(R) + '</span></div>' +
+    '<div class="step">T = 1/2 · (p″ − p′) · (x′ − x″) = 1/2 · ' + fmt.n(pHi - pLo) + ' · ' +
+      fmt.n(x1 - x2) + ' = <span class="res">' + fmt.n(T) + '</span></div>' +
+    '<div class="step">Pérdida total = R + T = <span class="res">' + fmt.n(R + T) + '</span></div>';
+
+  document.getElementById("note").textContent = subio
+    ? "R es lo que el consumidor paga de más por las x″ unidades que sigue comprando. T es el valor que pierde al dejar de comprar " +
+      fmt.n(x1 - x2) + " unidades que antes le convenían. La suma de ambas es la caída del excedente."
+    : "Los sliders quedaron con p′ mayor que p″: el gráfico muestra igual el tramo entre ambos precios, pero leído al revés " +
+      "R + T es lo que el consumidor gana cuando el precio baja.";
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+initTools({ state, defaults, layers, layerDefaults, format, render,
+            canvas: "c-main", file: "m03-variacion-ec" });
+</script>
+</body>
+</html>
