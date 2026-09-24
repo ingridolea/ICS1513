@@ -10,7 +10,7 @@
 
   const C = {};
   ["demand","supply","policy","cs","cs-line","ps","ps-line","dwl","dwl-line",
-   "fiscal","fiscal-line","transfer","total","total-line","grid","axis","txt","muted"]
+   "fiscal","fiscal-line","transfer","total","total-line","indif","grid","axis","txt","muted"]
     .forEach(k => Object.defineProperty(C, k.replace(/-(\w)/g, (m,c) => c.toUpperCase()), {
       get: () => css("--c-" + k)
     }));
@@ -121,6 +121,25 @@
       const x = this.tx(q), y = this.ty(p);
       started ? ctx.lineTo(x, y) : (ctx.moveTo(x, y), started = true);
     }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = o.width || 2;
+    ctx.setLineDash(o.dash || []);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    return this;
+  };
+
+  /* Polilinea a partir de una lista de puntos [[x,y], ...] en coordenadas del grafico */
+  Plot.prototype.poly = function (pts, color, o) {
+    o = o || {};
+    const ctx = this.ctx;
+    ctx.beginPath();
+    let started = false;
+    pts.forEach(pt => {
+      if (!pt || !isFinite(pt[0]) || !isFinite(pt[1])) { started = false; return; }
+      const x = this.tx(pt[0]), y = this.ty(pt[1]);
+      started ? ctx.lineTo(x, y) : (ctx.moveTo(x, y), started = true);
+    });
     ctx.strokeStyle = color;
     ctx.lineWidth = o.width || 2;
     ctx.setLineDash(o.dash || []);
@@ -283,6 +302,27 @@
     ctx.lineTo(this.tx(values.length), this.ty(o.asc ? top : 0));
     ctx.stroke();
     ctx.setLineDash([]);
+    return this;
+  };
+
+  /* Flecha doble bajo el eje X, en la fila `fila` (0, 1, 2 …).
+     Sirve para los tramos de efecto sustitución y efecto ingreso. */
+  Plot.prototype.spanBelow = function (q1, q2, fila, text, color) {
+    const ctx = this.ctx, c = color || C.txt;
+    const y = this.pad.t + this.gH + 26 + (fila || 0) * 17;
+    const x1 = this.tx(q1), x2 = this.tx(q2);
+    ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 1.1;
+    ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+    // punta solo en el extremo de llegada, para que se lea la dirección
+    const s = x2 >= x1 ? -1 : 1;
+    ctx.beginPath();
+    ctx.moveTo(x2, y); ctx.lineTo(x2 + 6 * s, y - 3.2); ctx.lineTo(x2 + 6 * s, y + 3.2);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x1, y - 4); ctx.lineTo(x1, y + 4); ctx.stroke();
+    if (text) {
+      ctx.font = FONT; ctx.textAlign = "left";
+      ctx.fillText(text, Math.max(x1, x2) + 8, y + 3.5);
+    }
     return this;
   };
 

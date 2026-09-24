@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Efecto de presentación: el dilema de la enfermedad — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+<style>
+  .dilema { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 700px) { .dilema { grid-template-columns: 1fr; } }
+  .opcion {
+    display: block; width: 100%; text-align: left;
+    font-family: inherit; font-size: 13px; line-height: 1.5;
+    background: var(--pu-bg); color: var(--c-txt);
+    border: 1.5px solid var(--pu-gray); border-radius: 10px;
+    padding: 11px 13px; margin-top: 8px; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .opcion:hover { border-color: var(--pu-mid); }
+  .opcion.elegida { border-color: var(--pu-mid); background: rgba(148,84,213,0.10); }
+  .opcion b { color: var(--pu-dark); }
+  .enunciado { font-size: 13px; line-height: 1.6; color: var(--c-txt); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Efecto de presentaci&oacute;n: el dilema de la enfermedad</h1>
+  <span>M30 &middot; Econom&iacute;a del comportamiento</span>
+</header>
+
+<div class="app">
+
+  <div class="panel-note" style="padding:0 4px">
+    Una enfermedad amenaza a 600 personas. Elige en cada versi&oacute;n del problema, sin mirar la otra, y despu&eacute;s revela el resultado.
+  </div>
+
+  <div class="dilema">
+    <div class="panel">
+      <div class="panel-title">Versi&oacute;n 1 &mdash; vidas salvadas</div>
+      <div class="enunciado">Se presentan dos alternativas de tratamiento:</div>
+      <button class="opcion" data-grupo="uno" data-op="A"><b>Tratamiento A:</b> 200 vidas se salvan con seguridad.</button>
+      <button class="opcion" data-grupo="uno" data-op="B"><b>Tratamiento B:</b> hay 1/3 de probabilidad de salvar 600 vidas y 2/3 de no salvar ninguna.</button>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Versi&oacute;n 2 &mdash; muertes</div>
+      <div class="enunciado">Ahora considera estas alternativas:</div>
+      <button class="opcion" data-grupo="dos" data-op="C"><b>Tratamiento C:</b> 400 personas mueren con seguridad.</button>
+      <button class="opcion" data-grupo="dos" data-op="D"><b>Tratamiento D:</b> hay 2/3 de probabilidad de que mueran 600 personas y 1/3 de que no muera ninguna.</button>
+    </div>
+  </div>
+
+  <div class="top-bar">
+    <button class="tool-btn" id="btn-revelar">Revelar</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title">Los cuatro tratamientos, en n&uacute;meros esperados</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note">Elige una opci&oacute;n en cada versi&oacute;n y pulsa <b>Revelar</b>.</div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="wtable">
+      <thead><tr><th>Tratamiento</th><th>Presentaci&oacute;n</th><th>Vidas salvadas (esperadas)</th><th>Muertes (esperadas)</th><th>Riesgo</th></tr></thead>
+      <tbody id="tabla"></tbody>
+    </table>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup">
+      <div class="mgroup-label">Tu elecci&oacute;n</div>
+      <div class="metric"><div class="ml">Versi&oacute;n 1 &mdash; vidas salvadas</div><div class="mv" id="m-uno">&mdash;</div></div>
+      <div class="metric"><div class="ml">Versi&oacute;n 2 &mdash; muertes</div><div class="mv" id="m-dos">&mdash;</div></div>
+    </div>
+    <div class="mgroup">
+      <div class="mgroup-label">Coherencia</div>
+      <div class="metric full"><div class="ml">&iquest;Elegiste opciones equivalentes en ambas versiones?</div><div class="mv" id="m-coher">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, initTools } = ICS;
+
+const defaults = {};
+const state    = { uno: null, dos: null };
+let revelado = false;
+
+// Los cuatro tratamientos descritos en el anexo de la clase, sobre 600 personas
+const TRAT = {
+  A: { ver: "Vidas salvadas", salva: 200, seguro: true  },
+  B: { ver: "Vidas salvadas", salva: 600 / 3, seguro: false },
+  C: { ver: "Muertes",        salva: 600 - 400, seguro: true  },
+  D: { ver: "Muertes",        salva: 600 * (1 / 3), seguro: false }
+};
+
+const plot = new Plot("c-main", { height: 300, pad: { l: 62, r: 28, t: 28, b: 52 } });
+
+function render() {
+  const orden = ["A", "B", "C", "D"];
+
+  plot.begin(4, 620);
+  const ctx = plot.ctx;
+  ctx.strokeStyle = C.axis; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(plot.pad.l, plot.pad.t);
+  ctx.lineTo(plot.pad.l, plot.pad.t + plot.gH);
+  ctx.lineTo(plot.pad.l + plot.gW, plot.pad.t + plot.gH);
+  ctx.stroke();
+
+  // marcas del eje vertical
+  ctx.fillStyle = C.muted; ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
+  [0, 200, 400, 600].forEach(v => {
+    ctx.textAlign = "right";
+    ctx.fillText(String(v), plot.pad.l - 6, plot.ty(v) + 4);
+    if (v > 0) {
+      ctx.strokeStyle = C.grid; ctx.lineWidth = 0.6;
+      ctx.beginPath(); ctx.moveTo(plot.pad.l, plot.ty(v)); ctx.lineTo(plot.pad.l + plot.gW, plot.ty(v)); ctx.stroke();
+    }
+  });
+  ctx.textAlign = "left";
+  ctx.fillText("personas (de 600)", plot.pad.l - 52, plot.pad.t - 8);
+
+  orden.forEach((k, i) => {
+    const t = TRAT[k];
+    const elegido = (state.uno === k) || (state.dos === k);
+    const ancho = plot.gW / 4 * 0.46;
+    const cx = plot.tx(i + 0.5);
+    const muertes = 600 - t.salva;
+
+    // barra de vidas salvadas esperadas
+    ctx.fillStyle = revelado ? "rgba(79,164,92,0.55)" : "rgba(120,120,140,0.28)";
+    ctx.fillRect(cx - ancho, plot.ty(t.salva), ancho, plot.ty(0) - plot.ty(t.salva));
+    // barra de muertes esperadas
+    ctx.fillStyle = revelado ? "rgba(217,83,79,0.50)" : "rgba(120,120,140,0.18)";
+    ctx.fillRect(cx, plot.ty(muertes), ancho, plot.ty(0) - plot.ty(muertes));
+
+    if (elegido) {
+      ctx.strokeStyle = C.indif; ctx.lineWidth = 2;
+      ctx.strokeRect(cx - ancho - 4, plot.pad.t + 2, ancho * 2 + 8, plot.gH - 2);
+    }
+
+    ctx.fillStyle = C.txt; ctx.font = "600 12px 'Segoe UI', system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(k, cx, plot.pad.t + plot.gH + 18);
+    ctx.font = "10px 'Segoe UI', system-ui, sans-serif";
+    ctx.fillStyle = C.muted;
+    ctx.fillText(t.seguro ? "seguro" : "con riesgo", cx, plot.pad.t + plot.gH + 32);
+
+    if (revelado) {
+      ctx.font = "600 11px 'Segoe UI', system-ui, sans-serif";
+      ctx.fillStyle = C.psLine;
+      ctx.fillText(fmt.n(t.salva, 0), cx - ancho / 2, plot.ty(t.salva) - 5);
+      ctx.fillStyle = C.dwlLine;
+      ctx.fillText(fmt.n(muertes, 0), cx + ancho / 2, plot.ty(muertes) - 5);
+    }
+  });
+
+  if (revelado) {
+    ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillStyle = C.psLine;  ctx.fillText("■ se salvan", plot.pad.l + 6, plot.pad.t + 14);
+    ctx.fillStyle = C.dwlLine; ctx.fillText("■ mueren",    plot.pad.l + 86, plot.pad.t + 14);
+  }
+
+  document.getElementById("tabla").innerHTML = orden.map(k => {
+    const t = TRAT[k];
+    const oculto = !revelado;
+    return "<tr><td>" + k + "</td><td>" + t.ver + "</td>" +
+      "<td>" + (oculto ? "—" : fmt.n(t.salva, 0)) + "</td>" +
+      "<td>" + (oculto ? "—" : fmt.n(600 - t.salva, 0)) + "</td>" +
+      "<td>" + (t.seguro ? "resultado seguro" : "apuesta") + "</td></tr>";
+  }).join("");
+
+  document.getElementById("m-uno").textContent = state.uno ? "Tratamiento " + state.uno : "—";
+  document.getElementById("m-dos").textContent = state.dos ? "Tratamiento " + state.dos : "—";
+
+  const coher = document.getElementById("m-coher");
+  const nota  = document.getElementById("note");
+  if (!revelado) {
+    coher.textContent = "—";
+    nota.innerHTML = state.uno && state.dos
+      ? "Ya elegiste en las dos versiones. Pulsa <b>Revelar</b>."
+      : "Elige una opción en cada versión y pulsa <b>Revelar</b>.";
+  } else {
+    const seguroUno = state.uno === "A", seguroDos = state.dos === "C";
+    coher.textContent = !state.uno || !state.dos ? "falta elegir"
+      : seguroUno === seguroDos ? "sí, fuiste coherente" : "no: cambiaste de criterio";
+    nota.textContent =
+      "A y C son exactamente el mismo resultado: de 600 personas, 200 viven y 400 mueren, con certeza. " +
+      "B y D también son idénticos entre sí: un tercio de probabilidad de que se salven las 600 y dos tercios de que no se salve ninguna. " +
+      "Lo único que cambia entre las dos versiones es cómo está redactado el problema. " +
+      (!state.uno || !state.dos ? "" :
+        seguroUno === seguroDos
+          ? "Tú mantuviste el mismo criterio en ambas versiones, cosa que la mayoría de las personas no hace."
+          : "Cambiaste de criterio: elegiste lo seguro en una versión y la apuesta en la otra, que es justamente el patrón típico. " +
+            "Cuando el problema se plantea en términos de vidas salvadas la mayoría prefiere el tratamiento seguro, " +
+            "y cuando se plantea en términos de muertes la mayoría prefiere la apuesta, para evitar el énfasis en las muertes seguras.");
+  }
+}
+
+document.querySelectorAll(".opcion").forEach(b => {
+  b.addEventListener("click", () => {
+    state[b.dataset.grupo] = b.dataset.op;
+    document.querySelectorAll('.opcion[data-grupo="' + b.dataset.grupo + '"]')
+      .forEach(o => o.classList.toggle("elegida", o === b));
+    render();
+  });
+});
+
+document.getElementById("btn-revelar").addEventListener("click", function () {
+  revelado = !revelado;
+  this.textContent = revelado ? "Ocultar" : "Revelar";
+  this.classList.toggle("active", revelado);
+  render();
+});
+
+document.getElementById("btn-reset").addEventListener("click", () => {
+  state.uno = null; state.dos = null; revelado = false;
+  document.getElementById("btn-revelar").textContent = "Revelar";
+  document.getElementById("btn-revelar").classList.remove("active");
+  document.querySelectorAll(".opcion").forEach(o => o.classList.remove("elegida"));
+  render();
+});
+
+initTools({ state, defaults, format: {}, render, canvas: "c-main", file: "m30-framing" });
+</script>
+</body>
+</html>

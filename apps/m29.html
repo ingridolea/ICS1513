@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ejercicio: descomposición de Slutsky con demanda dada — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Ejercicio: descomposici&oacute;n de Slutsky con una demanda dada</h1>
+  <span>M29 &middot; Decisiones de los consumidores</span>
+</header>
+
+<div class="app">
+
+  <div class="algebra" style="line-height:2.2">
+    <div class="step">x₁*(p₁, p₂, m) = 10 + m / (10·p₁)     [unidades por semana]</div>
+    <div class="step">Con m = 120 dólares semanales y p₁ = 1 dólar por unidad:</div>
+    <div class="step">I.  Calcule la demanda.   II. Si p₁ baja a 0,8: ¿cuánto cambia el consumo, y cuánto es sustitución y cuánto ingreso?</div>
+  </div>
+
+  <div class="top-bar">
+    <button class="tool-btn" data-preset="enunciado">Datos del enunciado</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-sol">Mostrar soluci&oacute;n</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title">Demanda marshalliana y demanda compensada</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Demanda marshalliana &nbsp;x&#8321;*(p&#8321;, m)</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-cs-line)" stroke-width="2.5" stroke-dasharray="6 4"/></svg>Demanda compensada a la Slutsky (mantiene alcanzable la cesta X)</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Precios</div>
+        <div class="sr"><div class="sh"><span class="sn">Precio inicial p&#8321;</span><span class="sv" id="v-p1">1.00</span></div>
+          <input type="range" data-p="p1" min="0.4" max="3" step="0.05" value="1"></div>
+        <div class="sr"><div class="sh"><span class="sn">Precio final p&#8321;&prime;</span><span class="sv" id="v-p1b">0.80</span></div>
+          <input type="range" data-p="p1b" min="0.4" max="3" step="0.05" value="0.8"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Ingreso</div>
+        <div class="sr"><div class="sh"><span class="sn">m (d&oacute;lares por semana)</span><span class="sv" id="v-m">120</span></div>
+          <input type="range" data-p="m" min="40" max="300" step="5" value="120"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Sobre esta demanda</div>
+        <div class="panel-note">El t&eacute;rmino m/(10p&#8321;) depende del ingreso, as&iacute; que el bien tiene efecto ingreso positivo:
+          es un bien normal. El 10 fijo es la parte que el consumidor compra pase lo que pase.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Las tres cantidades</div>
+      <div class="metric"><div class="ml">X &mdash; x&#8321;*(p&#8321;, m)</div><div class="mv" id="m-x">&mdash;</div></div>
+      <div class="metric"><div class="ml">Y &mdash; x&#8321;*(p&#8321;&prime;, m&prime;)</div><div class="mv" id="m-y">&mdash;</div></div>
+      <div class="metric"><div class="ml">Z &mdash; x&#8321;*(p&#8321;&prime;, m)</div><div class="mv" id="m-z">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Descomposici&oacute;n</div>
+      <div class="metric"><div class="ml">&Delta;x&#8321;&#738; sustituci&oacute;n</div><div class="mv" id="m-sust">&mdash;</div></div>
+      <div class="metric"><div class="ml">&Delta;x&#8321;&#8319; ingreso</div><div class="mv" id="m-ing">&mdash;</div></div>
+      <div class="metric"><div class="ml">&Delta;x&#8321; total</div><div class="mv" id="m-tot">&mdash;</div></div>
+    </div>
+  </div>
+
+  <div class="algebra" id="solucion" style="display:none"></div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindPresets, initTools } = ICS;
+
+const defaults = { p1: 1, p1b: 0.8, m: 120 };
+const state    = Object.assign({}, defaults);
+const presets  = { enunciado: { p1: 1, p1b: 0.8, m: 120 } };
+const format   = { p1: v => v.toFixed(2), p1b: v => v.toFixed(2), m: v => v.toFixed(0) };
+
+let verSolucion = false;
+
+// la demanda del enunciado
+const x1 = (p1, m) => 10 + m / (10 * p1);
+
+const plot = new Plot("c-main", { height: 400, pad: { l: 52, r: 22, t: 28, b: 78 } });
+
+function render() {
+  const s = state;
+  const X = x1(s.p1, s.m);
+  const mP = s.m + X * (s.p1b - s.p1);        // renta compensada a la Slutsky
+  const Y = x1(s.p1b, mP);
+  const Z = x1(s.p1b, s.m);
+  const dS = Y - X, dN = Z - Y, dT = Z - X;
+
+  const pLo = 0.4, pHi = 3;
+  const maxQ = Math.max(x1(pLo, s.m), X, Z) * 1.08;
+  plot.begin(maxQ, pHi * 1.05).grid()
+      .axes("Cantidad x₁  (unidades por semana)", "Precio p₁",
+            { skipQ: [X, Y, Z], skipP: [s.p1, s.p1b] });
+
+  const traza = (fn, col, o) => {
+    const pts = [];
+    for (let i = 0; i <= 200; i++) {
+      const p = pLo + (pHi - pLo) * i / 200;
+      pts.push([fn(p), p]);
+    }
+    plot.poly(pts, col, o);
+  };
+  // compensada: en cada precio se ajusta la renta para que X siga siendo alcanzable
+  traza(p => x1(p, s.m + X * (p - s.p1)), C.csLine, { width: 2, dash: [6, 4] });
+  traza(p => x1(p, s.m), C.demand, { width: 2.6 });
+
+  plot.seg(0, s.p1,  maxQ, s.p1,  C.muted, { dash: [3, 3], width: 0.9 });
+  plot.seg(0, s.p1b, maxQ, s.p1b, C.muted, { dash: [3, 3], width: 0.9 });
+  plot.tickP(s.p1,  "p₁",  C.txt);
+  plot.tickP(s.p1b, "p₁′", C.txt);
+
+  [[X, s.p1, "X", C.demand], [Y, s.p1b, "Y", C.csLine], [Z, s.p1b, "Z", C.supply]].forEach(([q, p, nom, col]) => {
+    plot.seg(q, 0, q, p, C.muted, { dash: [3, 3], width: 0.9 });
+    plot.dot(q, p, col);
+    plot.label(q, p, nom, C.txt, { dx: 7, dy: -7, bold: true, box: true });
+    plot.tickQ(q, fmt.n(q), col);
+  });
+  plot.spanBelow(X, Y, 0, "sustitución", C.csLine);
+  plot.spanBelow(Y, Z, 1, "ingreso", C.supply);
+
+  const signo = v => (v > 0 ? "+" : "") + fmt.n(v);
+  document.getElementById("m-x").textContent    = fmt.n(X);
+  document.getElementById("m-y").textContent    = fmt.n(Y);
+  document.getElementById("m-z").textContent    = fmt.n(Z);
+  document.getElementById("m-sust").textContent = signo(dS);
+  document.getElementById("m-ing").textContent  = signo(dN);
+  document.getElementById("m-tot").textContent  = signo(dT);
+
+  document.getElementById("note").textContent =
+    "La curva punteada es la demanda compensada: en cada precio le ajustamos la renta al consumidor para que pueda " +
+    "seguir comprando exactamente la cesta X. Es más inclinada que la marshalliana, y esa diferencia es justamente el efecto ingreso.";
+
+  document.getElementById("solucion").innerHTML = !verSolucion ? "" :
+    '<div class="step">I.  x₁*(' + fmt.n(s.p1, 2) + ', p₂, ' + fmt.n(s.m, 0) + ') = 10 + ' + fmt.n(s.m, 0) +
+      '/(10·' + fmt.n(s.p1, 2) + ') = <span class="res">' + fmt.n(X) + '</span></div>' +
+    '<div class="step">II. x₁*(' + fmt.n(s.p1b, 2) + ', p₂, ' + fmt.n(s.m, 0) + ') = 10 + ' + fmt.n(s.m, 0) +
+      '/(10·' + fmt.n(s.p1b, 2) + ') = <span class="res">' + fmt.n(Z) + '</span></div>' +
+    '<div class="step">    Δx₁ = ' + fmt.n(Z) + ' − ' + fmt.n(X) + ' = <span class="res">' + fmt.n(dT) + '</span></div>' +
+    '<div class="step">    m′ = m + x₁·(p₁′ − p₁) = ' + fmt.n(s.m, 0) + ' + ' + fmt.n(X) + '·(' +
+      fmt.n(s.p1b, 2) + ' − ' + fmt.n(s.p1, 2) + ') = <span class="res">' + fmt.n(mP) + '</span></div>' +
+    '<div class="step">    Δx₁ˢ = x₁*(p₁′, p₂, m′) − x₁*(p₁, p₂, m) = ' + fmt.n(Y) + ' − ' + fmt.n(X) +
+      ' = <span class="res">' + fmt.n(dS) + '</span></div>' +
+    '<div class="step">    Δx₁ⁿ = x₁*(p₁′, p₂, m) − x₁*(p₁′, p₂, m′) = ' + fmt.n(Z) + ' − ' + fmt.n(Y) +
+      ' = <span class="res">' + fmt.n(dN) + '</span></div>' +
+    '<div class="step">    Comprobación: ' + fmt.n(dS) + ' + ' + fmt.n(dN) + ' = ' + fmt.n(dT) + ' ✓</div>';
+}
+
+document.getElementById("btn-sol").addEventListener("click", function () {
+  verSolucion = !verSolucion;
+  this.textContent = verSolucion ? "Ocultar solución" : "Mostrar solución";
+  this.classList.toggle("active", verSolucion);
+  document.getElementById("solucion").style.display = verSolucion ? "" : "none";
+  render();
+});
+
+bindSliders(state, render, format);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m29-ejercicio-slutsky" });
+</script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comercio internacional: país exportador e importador — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Comercio internacional: pa&iacute;s exportador e importador</h1>
+  <span>M19 &middot; Comercio internacional</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="chip" data-layer="flujo"><span class="dot" style="background:var(--c-policy)"></span>Exportaciones / importaciones</button>
+    <button class="chip" data-layer="letras"><span class="dot" style="background:var(--pu-mid)"></span>&Aacute;reas A&ndash;D</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" data-preset="autarquia">Sin comercio</button>
+    <button class="tool-btn" data-preset="exporta">Exportador</button>
+    <button class="tool-btn" data-preset="importa">Importador</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Mercado nacional frente al precio mundial</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Demanda nacional</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Oferta nacional</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-policy)" stroke-width="2.5"/></svg>Precio mundial P<sub>M</sub></span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-cs)"></span>Excedente consumidor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-ps)"></span>Excedente productor</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Precio mundial</div>
+        <div class="sr"><div class="sh"><span class="sn">P<sub>M</sub> &mdash; el pa&iacute;s es peque&ntilde;o y lo toma como dado</span><span class="sv" id="v-pm">14.0</span></div>
+          <input type="range" data-p="pm" min="2" max="20" step="0.5" value="14"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Demanda nacional &nbsp;P = a &minus; b&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (a)</span><span class="sv" id="v-a">20</span></div>
+          <input type="range" data-p="a" min="10" max="40" step="0.5" value="20"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (b)</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Oferta nacional &nbsp;P = c + d&middot;Q</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (c)</span><span class="sv" id="v-c">2</span></div>
+          <input type="range" data-p="c" min="0" max="15" step="0.5" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (d)</span><span class="sv" id="v-d">1.0</span></div>
+          <input type="range" data-p="d" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="wtable" id="tabla">
+      <thead><tr><th></th><th>Sin comercio</th><th>Con comercio</th><th>&Aacute;reas</th><th>Cambio</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Cantidades</div>
+      <div class="metric"><div class="ml">Producci&oacute;n nacional Q<sub>S</sub></div><div class="mv" id="m-qs">&mdash;</div></div>
+      <div class="metric"><div class="ml">Consumo nacional Q<sub>D</sub></div><div class="mv" id="m-qd">&mdash;</div></div>
+      <div class="metric"><div class="ml" id="ml-flujo">Exportaciones</div><div class="mv" id="m-flujo">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Precios y ganancia</div>
+      <div class="metric"><div class="ml">Precio sin comercio P*</div><div class="mv" id="m-peq">&mdash;</div></div>
+      <div class="metric"><div class="ml">Precio con comercio</div><div class="mv" id="m-pm">&mdash;</div></div>
+      <div class="metric"><div class="ml">Ganancia del comercio</div><div class="mv" id="m-gan">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, bindPresets, initTools } = ICS;
+
+const defaults = { pm: 14, a: 20, b: 1, c: 2, d: 1 };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { flujo: true, letras: true };
+const layers        = Object.assign({}, layerDefaults);
+
+const presets = { autarquia: { pm: 11 }, exporta: { pm: 14 }, importa: { pm: 8 } };
+
+const format = { pm: v => v.toFixed(1), a: v => v.toFixed(1), b: v => v.toFixed(1),
+                 c: v => v.toFixed(1), d: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 400 });
+
+function render() {
+  const s = state;
+  const D = q => s.a - s.b * q;
+  const S = q => s.c + s.d * q;
+  const Qeq = (s.a - s.c) / (s.b + s.d), Peq = D(Qeq);
+  const P = s.pm;
+
+  const Qd = Math.max(0, (s.a - P) / s.b);   // consumo nacional al precio mundial
+  const Qs = Math.max(0, (P - s.c) / s.d);   // producción nacional
+  const exporta  = P > Peq + 1e-9;
+  const importa  = P < Peq - 1e-9;
+  const flujo    = Math.abs(Qs - Qd);
+
+  const maxQ = Math.max(Qeq * 2.2, Qd * 1.12, Qs * 1.12);
+  const maxP = Math.max(s.a, P) * 1.15;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad", "Precio", { skipP: [Peq, P], skipQ: [Qd, Qs, Qeq] });
+
+  // bienestar sin comercio y con comercio
+  const EC0 = 0.5 * (s.a - Peq) * Qeq, EP0 = 0.5 * (Peq - s.c) * Qeq;
+  const EC1 = 0.5 * (s.a - P) * Qd,    EP1 = 0.5 * (P - s.c) * Qs;
+
+  plot.area([[0, s.a], [Qd, P], [0, P]], C.cs, C.csLine);
+  plot.area([[0, s.c], [Qs, P], [0, P]], C.ps, C.psLine);
+
+  plot.curve(D, C.demand, { width: 2.4, to: s.a / s.b });
+  plot.curve(S, C.supply, { width: 2.4 });
+
+  plot.seg(0, P, maxQ, P, C.policy, { width: 2.2 });
+  plot.tickP(P, "P_M", C.policy);
+  plot.seg(Qeq, 0, Qeq, Peq, C.muted, { dash: [3, 3], width: 0.9 });
+  plot.dot(Qeq, Peq, C.muted);
+  plot.tickP(Peq, "P*", C.muted);
+  plot.tickQ(Qeq, "Q*", C.muted);
+
+  if (flujo > 0.02) {
+    plot.seg(Qd, 0, Qd, P, C.muted, { dash: [4, 3], width: 1 });
+    plot.seg(Qs, 0, Qs, P, C.muted, { dash: [4, 3], width: 1 });
+    plot.tickQ(Qd, "Q_D", C.policy);
+    plot.tickQ(Qs, "Q_S", C.policy);
+    if (layers.flujo)
+      plot.spanH(Math.min(Qd, Qs), Math.max(Qd, Qs), P + maxP * 0.055,
+        (exporta ? "Exportaciones " : "Importaciones ") + fmt.n(flujo), C.policy);
+  }
+
+  // el triángulo de ganancia del comercio, entre ambas curvas y entre Q* y la cantidad transada
+  const gan = (EC1 + EP1) - (EC0 + EP0);
+  if (flujo > 0.02) {
+    const qA = Math.min(Qd, Qs), qB = Math.max(Qd, Qs);
+    plot.area([[Qeq, Peq], [qA, P], [qB, P]], C.total, C.totalLine);
+    if (layers.letras)
+      plot.label((qA + qB) / 2 * 0.55 + Qeq * 0.45, (P + Peq) / 2, "D", C.txt, { bold: true, align: "center" });
+  }
+
+  if (layers.letras) {
+    plot.label(Math.max(Qd, 0.5) * 0.35, (s.a + P) / 2, "A", C.txt, { bold: true, align: "center" });
+    if (exporta) plot.label(Qd * 0.45, (P + Peq) / 2, "B", C.txt, { bold: true, align: "center" });
+    if (importa) plot.label(Qs * 0.45, (P + Peq) / 2, "B", C.txt, { bold: true, align: "center" });
+    plot.label(Math.max(Qs, 0.5) * 0.3, (s.c + Math.min(P, Peq)) / 2, "C", C.txt, { bold: true, align: "center" });
+  }
+
+  plot.label(maxQ * 0.9, Math.max(D(maxQ * 0.9), 0), "Demanda nacional", C.demand, { dx: 4, dy: 13, align: "right", box: true });
+  plot.label(maxQ * 0.9, S(maxQ * 0.9), "Oferta nacional", C.supply, { dx: 4, dy: -6, align: "right", box: true });
+
+  /* ---------- números y tabla ---------- */
+  document.getElementById("ptitle").textContent = exporta
+    ? "País exportador: el precio mundial está sobre el precio de equilibrio"
+    : importa ? "País importador: el precio mundial está bajo el precio de equilibrio"
+              : "Precio mundial igual al de equilibrio: no hay comercio";
+  document.getElementById("ml-flujo").textContent = exporta ? "Exportaciones" : importa ? "Importaciones" : "Comercio";
+
+  document.getElementById("m-qs").textContent  = fmt.n(Qs);
+  document.getElementById("m-qd").textContent  = fmt.n(Qd);
+  document.getElementById("m-flujo").textContent = fmt.n(flujo);
+  document.getElementById("m-peq").textContent = fmt.n(Peq);
+  document.getElementById("m-pm").textContent  = fmt.n(P);
+  document.getElementById("m-gan").textContent = "+" + fmt.n(Math.max(gan, 0));
+
+  const areas = exporta
+    ? [["Excedente del consumidor", EC0, EC1, "A+B", "A", "−B"],
+       ["Excedente del productor",  EP0, EP1, "C", "B+C+D", "+B+D"],
+       ["Excedente total", EC0 + EP0, EC1 + EP1, "A+B+C", "A+B+C+D", "+D"]]
+    : importa
+    ? [["Excedente del consumidor", EC0, EC1, "A", "A+B+D", "+B+D"],
+       ["Excedente del productor",  EP0, EP1, "B+C", "C", "−B"],
+       ["Excedente total", EC0 + EP0, EC1 + EP1, "A+B+C", "A+B+C+D", "+D"]]
+    : [["Excedente del consumidor", EC0, EC1, "A", "A", "0"],
+       ["Excedente del productor",  EP0, EP1, "C", "C", "0"],
+       ["Excedente total", EC0 + EP0, EC1 + EP1, "A+C", "A+C", "0"]];
+
+  document.querySelector("#tabla tbody").innerHTML = areas.map(([n, v0, v1, a0, a1, ch]) => {
+    const dif = v1 - v0;
+    return "<tr><td>" + n + "</td><td>" + fmt.n(v0) + "</td><td>" + fmt.n(v1) + "</td>" +
+      "<td style='opacity:.6'>" + a0 + " → " + a1 + "</td>" +
+      '<td class="' + (dif > 0.005 ? "pos" : dif < -0.005 ? "neg" : "") + '">' +
+      (dif > 0.005 ? "+" : "") + fmt.n(dif) + "</td></tr>";
+  }).join("");
+
+  const nota = document.getElementById("note");
+  if (exporta) {
+    nota.textContent = "Al abrirse al comercio el precio interno sube hasta P_M. Los productores nacionales ganan " +
+      "(+" + fmt.n(EP1 - EP0) + ") porque venden más caro y producen más; los consumidores pierden (" + fmt.n(EC1 - EC0) +
+      ") porque pagan más. La ganancia supera a la pérdida: el excedente total sube en " + fmt.n(gan) +
+      ", que es el triángulo D. El país gana, pero no todos dentro del país ganan.";
+  } else if (importa) {
+    nota.textContent = "Al abrirse al comercio el precio interno baja hasta P_M. Los consumidores ganan (+" +
+      fmt.n(EC1 - EC0) + ") y los productores nacionales pierden (" + fmt.n(EP1 - EP0) + "). " +
+      "El saldo neto es positivo: +" + fmt.n(gan) + ". Ese es el triángulo D, y es la razón por la que el comercio " +
+      "aumenta la eficiencia aunque genere perdedores concretos, como las fábricas textiles del ejemplo de la clase.";
+  } else {
+    nota.textContent = "Con el precio mundial igual al de equilibrio no hay ni exportaciones ni importaciones: " +
+      "el país ya estaba produciendo y consumiendo exactamente lo mismo. Mueve P_M para abrir el comercio.";
+  }
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, layers, layerDefaults, format, render,
+            canvas: "c-main", file: "m19-comercio-internacional" });
+</script>
+</body>
+</html>

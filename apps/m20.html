@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aranceles de importación — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Aranceles de importaci&oacute;n</h1>
+  <span>M20 &middot; Comercio internacional</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="chip" data-layer="letras"><span class="dot" style="background:var(--pu-mid)"></span>&Aacute;reas A&ndash;G</button>
+    <button class="chip" data-layer="colores"><span class="dot" style="background:var(--c-cs-line)"></span>Colores por agente</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" data-preset="libre">Sin arancel</button>
+    <button class="tool-btn" data-preset="medio">Arancel moderado</button>
+    <button class="tool-btn" data-preset="prohib">Arancel prohibitivo</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Mercado importador con arancel</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-cs)"></span>A + B &mdash; excedente del consumidor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-ps)"></span>C + G &mdash; excedente del productor</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-fiscal)"></span>E &mdash; recaudaci&oacute;n del arancel</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-dwl)"></span>D + F &mdash; p&eacute;rdida social</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Pol&iacute;tica comercial</div>
+        <div class="sr"><div class="sh"><span class="sn">Arancel por unidad (&tau;)</span><span class="sv" id="v-tau">2.0</span></div>
+          <input type="range" data-p="tau" min="0" max="8" step="0.25" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Precio mundial P<sub>M</sub></span><span class="sv" id="v-pm">6.0</span></div>
+          <input type="range" data-p="pm" min="1" max="12" step="0.5" value="6"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Demanda nacional</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (a)</span><span class="sv" id="v-a">20</span></div>
+          <input type="range" data-p="a" min="10" max="40" step="0.5" value="20"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (b)</span><span class="sv" id="v-b">1.0</span></div>
+          <input type="range" data-p="b" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Oferta nacional</div>
+        <div class="sr"><div class="sh"><span class="sn">Intercepto (c)</span><span class="sv" id="v-c">2</span></div>
+          <input type="range" data-p="c" min="0" max="15" step="0.5" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Pendiente (d)</span><span class="sv" id="v-d">1.0</span></div>
+          <input type="range" data-p="d" min="0.3" max="3" step="0.1" value="1"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="wtable" id="tabla">
+      <thead><tr><th></th><th>Sin arancel</th><th>Con arancel</th><th>&Aacute;reas</th><th>Cambio</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Cantidades</div>
+      <div class="metric"><div class="ml">Producci&oacute;n nacional</div><div class="mv" id="m-qs">&mdash;</div></div>
+      <div class="metric"><div class="ml">Consumo nacional</div><div class="mv" id="m-qd">&mdash;</div></div>
+      <div class="metric"><div class="ml">Importaciones</div><div class="mv" id="m-imp">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Cuentas</div>
+      <div class="metric"><div class="ml">Recaudaci&oacute;n del arancel</div><div class="mv" id="m-rec">&mdash;</div></div>
+      <div class="metric"><div class="ml">P&eacute;rdida social D + F</div><div class="mv" id="m-dwl">&mdash;</div></div>
+      <div class="metric"><div class="ml">Precio interno</div><div class="mv" id="m-pint">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, bindPresets, initTools } = ICS;
+
+const defaults = { tau: 2, pm: 6, a: 20, b: 1, c: 2, d: 1 };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { letras: true, colores: true };
+const layers        = Object.assign({}, layerDefaults);
+
+const presets = { libre: { tau: 0 }, medio: { tau: 2 }, prohib: { tau: 6 } };
+
+const format = { tau: v => v.toFixed(2), pm: v => v.toFixed(1), a: v => v.toFixed(1),
+                 b: v => v.toFixed(1), c: v => v.toFixed(1), d: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 410 });
+
+function render() {
+  const s = state;
+  const D = q => s.a - s.b * q;
+  const S = q => s.c + s.d * q;
+  const Qeq = (s.a - s.c) / (s.b + s.d), Peq = D(Qeq);
+
+  // el arancel deja de morder cuando el precio interno alcanza el de equilibrio
+  const Pint = Math.min(s.pm + s.tau, Peq);
+  const tauEfectivo = Pint - s.pm;
+  const prohibitivo = s.pm + s.tau >= Peq - 1e-9;
+
+  const Qs1 = Math.max(0, (s.pm - s.c) / s.d),  Qd1 = Math.max(0, (s.a - s.pm) / s.b);
+  const Qs2 = Math.max(0, (Pint - s.c) / s.d),  Qd2 = Math.max(0, (s.a - Pint) / s.b);
+  const imp1 = Qd1 - Qs1, imp2 = Math.max(0, Qd2 - Qs2);
+
+  const maxQ = Math.max(Qd1 * 1.12, Qeq * 2);
+  const maxP = Math.max(s.a, Pint) * 1.15;
+  plot.begin(maxQ, maxP).grid()
+      .axes("Cantidad", "Precio", { skipP: [s.pm, Pint], skipQ: [Qs1, Qs2, Qd2, Qd1] });
+
+  const gris = "rgba(120,120,140,0.16)";
+  const col = k => layers.colores ? k : gris;
+
+  // A + B: excedente del consumidor con arancel
+  plot.area([[0, s.a], [Qd2, Pint], [0, Pint]], col(C.cs), C.csLine);
+  // C + G: excedente del productor con arancel
+  plot.area([[0, s.c], [Qs2, Pint], [0, Pint]], col(C.ps), C.psLine);
+  // E: recaudación, sobre las importaciones que quedan
+  if (imp2 > 0.01) plot.rect(Qs2, s.pm, Qd2, Pint, col(C.fiscal), C.fiscalLine);
+  // D y F: los dos triángulos de pérdida social
+  if (tauEfectivo > 0.01) {
+    plot.area([[Qs1, s.pm], [Qs2, Pint], [Qs2, s.pm]], col(C.dwl), C.dwlLine);
+    plot.area([[Qd2, Pint], [Qd1, s.pm], [Qd2, s.pm]], col(C.dwl), C.dwlLine);
+  }
+
+  plot.curve(D, C.demand, { width: 2.4, to: s.a / s.b });
+  plot.curve(S, C.supply, { width: 2.4 });
+
+  plot.seg(0, s.pm, maxQ, s.pm, C.muted, { width: 1.6, dash: [5, 3] });
+  plot.seg(0, Pint, maxQ, Pint, C.policy, { width: 2.2 });
+  plot.tickP(s.pm, "P_M", C.muted);
+  plot.tickP(Pint, "P_M+τ", C.policy);
+  if (tauEfectivo > 0.01) plot.spanV(s.pm, Pint, maxQ * 0.93, "Arancel " + fmt.n(tauEfectivo), C.policy);
+
+  [[Qs1, "Q¹ₛ"], [Qs2, "Q²ₛ"], [Qd2, "Q²_D"], [Qd1, "Q¹_D"]].forEach(([q, t]) => {
+    if (q > 0.02) { plot.seg(q, 0, q, D(q) > 0 ? Math.min(D(q), maxP) : Pint, C.muted, { dash: [3, 3], width: 0.8 }); }
+  });
+  plot.tickQ(Qs2, "Q²ₛ", C.policy);
+  plot.tickQ(Qd2, "Q²_D", C.policy);
+  if (imp2 > 0.05) plot.spanH(Qs2, Qd2, Pint - maxP * 0.055, "Importaciones " + fmt.n(imp2), C.policy);
+
+  // áreas
+  const A  = 0.5 * (s.a - Pint) * Qd2;
+  const B  = 0;  // en la lámina B es parte del EC; se reporta agregado con A
+  const Cc = (Pint - s.pm) * Qs2 + 0;
+  const Dd = 0.5 * tauEfectivo * (Qs2 - Qs1);
+  const E  = tauEfectivo * imp2;
+  const F  = 0.5 * tauEfectivo * (Qd1 - Qd2);
+  const G  = 0.5 * (s.pm - s.c) * Qs1;
+
+  const EC1 = 0.5 * (s.a - s.pm) * Qd1, EP1 = 0.5 * (s.pm - s.c) * Qs1;
+  const EC2 = A, EP2 = 0.5 * (Pint - s.c) * Qs2;
+
+  if (layers.letras) {
+    plot.label(Qd2 * 0.3, (s.a + Pint) / 2, "A", C.txt, { bold: true, align: "center" });
+    if (Qs2 > 0.3) plot.label(Qs2 * 0.45, (s.pm + Pint) / 2, "C", C.txt, { bold: true, align: "center" });
+    if (Qs2 > 0.3) plot.label(Qs2 * 0.4, (s.c + s.pm) / 2, "G", C.txt, { bold: true, align: "center" });
+    if (imp2 > 0.5)  plot.label((Qs2 + Qd2) / 2, (s.pm + Pint) / 2, "E", C.txt, { bold: true, align: "center" });
+    if (Qs2 - Qs1 > 0.3) plot.label(Qs1 + (Qs2 - Qs1) * 0.55, s.pm + tauEfectivo * 0.35, "D", C.dwlLine, { bold: true, align: "center" });
+    if (Qd1 - Qd2 > 0.3) plot.label(Qd2 + (Qd1 - Qd2) * 0.45, s.pm + tauEfectivo * 0.35, "F", C.dwlLine, { bold: true, align: "center" });
+  }
+
+  plot.label(maxQ * 0.9, Math.max(D(maxQ * 0.9), 0), "Demanda nacional", C.demand, { dx: 4, dy: 13, align: "right", box: true });
+  plot.label(maxQ * 0.9, S(maxQ * 0.9), "Oferta nacional", C.supply, { dx: 4, dy: -6, align: "right", box: true });
+
+  /* ---------- tabla y números ---------- */
+  const filas = [
+    ["Excedente del consumidor", EC1, EC2, "A+B+C+D+E+F", "A+B", "−C−D−E−F"],
+    ["Excedente del productor",  EP1, EP2, "G", "C+G", "+C"],
+    ["Recaudación del arancel",  0,   E,   "nada", "E", "+E"],
+    ["Excedente total", EC1 + EP1, EC2 + EP2 + E, "A+…+G", "A+B+C+E+G", "−D−F"]
+  ];
+  document.querySelector("#tabla tbody").innerHTML = filas.map(([n, v0, v1, a0, a1, ch]) => {
+    const dif = v1 - v0;
+    return "<tr><td>" + n + "</td><td>" + fmt.n(v0) + "</td><td>" + fmt.n(v1) + "</td>" +
+      "<td style='opacity:.6'>" + a0 + " → " + a1 + "</td>" +
+      '<td class="' + (dif > 0.005 ? "pos" : dif < -0.005 ? "neg" : "") + '">' +
+      (dif > 0.005 ? "+" : "") + fmt.n(dif) + "</td></tr>";
+  }).join("");
+
+  const dwl = (EC1 + EP1) - (EC2 + EP2 + E);
+  document.getElementById("ptitle").textContent = prohibitivo
+    ? "Arancel prohibitivo: el precio interno llega al de equilibrio y las importaciones desaparecen"
+    : tauEfectivo < 0.01 ? "Libre comercio: sin arancel" : "Mercado importador con arancel";
+  document.getElementById("m-qs").textContent   = fmt.n(Qs2);
+  document.getElementById("m-qd").textContent   = fmt.n(Qd2);
+  document.getElementById("m-imp").textContent  = fmt.n(imp2);
+  document.getElementById("m-rec").textContent  = fmt.n(E);
+  document.getElementById("m-dwl").textContent  = fmt.n(dwl);
+  document.getElementById("m-pint").textContent = fmt.n(Pint);
+
+  const nota = document.getElementById("note");
+  if (tauEfectivo < 0.01) {
+    nota.textContent = "Sin arancel el precio interno es el mundial y las importaciones son " + fmt.n(imp1) +
+      ". Sube τ para ver los dos efectos: sube la producción nacional y cae el consumo.";
+  } else if (prohibitivo) {
+    nota.textContent = "El arancel es tan alto que el precio interno alcanza el de equilibrio sin comercio: " +
+      "las importaciones caen a cero y el Estado deja de recaudar. El país vuelve a la autarquía y pierde " +
+      "toda la ganancia del comercio (" + fmt.n(dwl) + ").";
+  } else {
+    nota.textContent = "El arancel sube el precio interno a " + fmt.n(Pint) + ". La producción nacional pasa de " +
+      fmt.n(Qs1) + " a " + fmt.n(Qs2) + " y el consumo cae de " + fmt.n(Qd1) + " a " + fmt.n(Qd2) + ". " +
+      "El Estado recauda " + fmt.n(E) + " (área E) y los productores ganan " + fmt.n(EP2 - EP1) + " (área C), " +
+      "pero ambos salen del bolsillo del consumidor. Lo que no va a nadie son los triángulos D y F: " +
+      fmt.n(dwl) + " de pérdida social. D es producción nacional cara que reemplaza importaciones baratas; " +
+      "F son compras que simplemente dejan de hacerse.";
+  }
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, layers, layerDefaults, format, render,
+            canvas: "c-main", file: "m20-arancel" });
+</script>
+</body>
+</html>

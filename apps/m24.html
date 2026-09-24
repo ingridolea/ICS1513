@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Elección óptima del consumidor — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Elecci&oacute;n &oacute;ptima del consumidor</h1>
+  <span>M24 &middot; Decisiones de los consumidores</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="cobb">Cobb-Douglas</button>
+    <button class="tab" data-tab="sust">Sustitutos perfectos</button>
+    <button class="tab" data-tab="compl">Complementos perfectos</button>
+    <button class="tab" data-tab="cuasi">Cuasilineal</button>
+    <button class="tab" data-tab="geary">Necesidad</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Tangencia entre la recta presupuestaria y la curva de indiferencia</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Recta presupuestaria</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-indif)" stroke-width="2.5"/></svg>Curva de indiferencia del &oacute;ptimo</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-policy)" stroke-width="2.5" stroke-dasharray="5 3"/></svg>Cesta que est&aacute;s explorando</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Mercado</div>
+        <div class="sr"><div class="sh"><span class="sn">Precio del bien 1 (p&#8321;)</span><span class="sv" id="v-p1">2.00</span></div>
+          <input type="range" data-p="p1" min="0.5" max="6" step="0.1" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Precio del bien 2 (p&#8322;)</span><span class="sv" id="v-p2">2.00</span></div>
+          <input type="range" data-p="p2" min="0.5" max="6" step="0.1" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Ingreso (m)</span><span class="sv" id="v-m">120</span></div>
+          <input type="range" data-p="m" min="40" max="240" step="5" value="120"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Explorar la recta</div>
+        <div class="sr"><div class="sh"><span class="sn">Cesta con x&#8321; = &hellip; (sobre la recta)</span><span class="sv" id="v-expl">0.35</span></div>
+          <input type="range" data-p="expl" min="0.02" max="0.98" step="0.01" value="0.35"></div>
+        <div class="panel-note">Mueve esta cesta por la recta y compara la utilidad marginal por peso gastado en cada bien.</div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label" id="gl-par">Preferencias</div>
+        <div class="sr" id="sr-par"><div class="sh"><span class="sn" id="sn-par">&alpha;</span><span class="sv" id="v-par">0.50</span></div>
+          <input type="range" data-p="par" min="0.15" max="0.85" step="0.05" value="0.5"></div>
+        <div class="panel-note" id="nota-fam"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Elecci&oacute;n &oacute;ptima</div>
+      <div class="metric"><div class="ml">x&#8321;*</div><div class="mv" id="m-x1">&mdash;</div></div>
+      <div class="metric"><div class="ml">x&#8322;*</div><div class="mv" id="m-x2">&mdash;</div></div>
+      <div class="metric"><div class="ml">Utilidad m&aacute;xima</div><div class="mv" id="m-u">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">En la cesta que exploras</div>
+      <div class="metric"><div class="ml">UM&#8321;/p&#8321;</div><div class="mv" id="m-um1">&mdash;</div></div>
+      <div class="metric"><div class="ml">UM&#8322;/p&#8322;</div><div class="mv" id="m-um2">&mdash;</div></div>
+      <div class="metric"><div class="ml">Utilidad ah&iacute;</div><div class="mv" id="m-uex">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script src="consumo.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindTabs, initTools } = ICS;
+const { FAM, optimo, dibujarCurva, recta } = Consumo;
+
+const defaults = { p1: 2, p2: 2, m: 120, expl: 0.35, par: 0.5, tab: "cobb" };
+const state    = Object.assign({}, defaults);
+
+const format = { p1: v => v.toFixed(2), p2: v => v.toFixed(2), m: v => v.toFixed(0),
+                 expl: v => v.toFixed(2), par: v => v.toFixed(2) };
+
+const plot = new Plot("c-main", { height: 400 });
+
+let familiaPrevia = null;
+function sincronizarPar() {
+  const f = FAM[state.tab], fila = document.getElementById("sr-par");
+  if (familiaPrevia !== state.tab) {
+    if (f.slider) state.par = f.par[f.slider.clave];
+    familiaPrevia = state.tab;
+  }
+  if (!f.slider) { fila.style.display = "none"; return {}; }
+  fila.style.display = "";
+  const inp = fila.querySelector("input");
+  inp.min = f.slider.min; inp.max = f.slider.max; inp.step = f.slider.paso;
+  inp.value = state.par;
+  document.getElementById("sn-par").textContent = f.slider.rotulo;
+  document.getElementById("v-par").textContent = format.par(state.par);
+  return { [f.slider.clave]: state.par };
+}
+
+// utilidades marginales por diferencias finitas: sirve para cualquier familia
+function marginales(f, x1, x2, p) {
+  const h1 = Math.max(x1 * 1e-4, 1e-4), h2 = Math.max(x2 * 1e-4, 1e-4);
+  return {
+    um1: (f.U(x1 + h1, x2, p) - f.U(x1 - h1, x2, p)) / (2 * h1),
+    um2: (f.U(x1, x2 + h2, p) - f.U(x1, x2 - h2, p)) / (2 * h2)
+  };
+}
+
+function render() {
+  const s = state, fam = s.tab, f = FAM[fam];
+  const par = sincronizarPar();
+  const p = Object.assign({}, f.par, par);
+
+  document.getElementById("gl-par").textContent = "Preferencias — " + f.nombre;
+  document.getElementById("nota-fam").textContent = f.nota;
+  document.getElementById("ptitle").textContent = f.nombre + " · " + f.formula;
+
+  const opt = optimo(fam, s.p1, s.p2, s.m, par);
+  const x1max = s.m / s.p1, x2max = s.m / s.p2;
+
+  // la cesta explorada recorre la recta presupuestaria
+  const ex1 = s.expl * x1max, ex2 = (s.m - s.p1 * ex1) / s.p2;
+  const uex = f.U(ex1, ex2, p);
+
+  plot.begin(x1max * 1.12, x2max * 1.15).grid()
+      .axes("Bien 1  (x₁)", "Bien 2  (x₂)", { skipQ: [opt.x1, ex1], skipP: [opt.x2] });
+
+  // curvas por debajo y por encima del óptimo, para ver que la óptima es la más alta alcanzable
+  [0.75, 1.25].forEach(k => dibujarCurva(plot, fam, opt.u * k, par, "rgba(138,92,199,0.30)", { width: 1.4 }));
+  dibujarCurva(plot, fam, uex, par, C.policy, { width: 1.6, dash: [5, 3] });
+  dibujarCurva(plot, fam, opt.u, par, C.indif, { width: 2.4 });
+
+  recta(plot, s.p1, s.p2, s.m, C.demand, { width: 2.4 });
+
+  plot.dot(ex1, ex2, C.policy);
+  plot.label(ex1, ex2, "explorada", C.policy, { dx: 6, dy: 14, box: true });
+
+  plot.seg(opt.x1, 0, opt.x1, opt.x2, C.muted, { dash: [3, 3], width: 0.9 });
+  plot.seg(0, opt.x2, opt.x1, opt.x2, C.muted, { dash: [3, 3], width: 0.9 });
+  plot.dot(opt.x1, opt.x2, C.txt);
+  plot.tickQ(opt.x1, "x₁*", C.txt);
+  plot.tickP(opt.x2, "x₂*", C.txt);
+  plot.label(opt.x1, opt.x2, "óptimo", C.txt, { dx: 7, dy: -8, bold: true, box: true });
+
+  const mg = marginales(f, ex1, ex2, p);
+  const r1 = mg.um1 / s.p1, r2 = mg.um2 / s.p2;
+
+  document.getElementById("m-x1").textContent = fmt.n(opt.x1);
+  document.getElementById("m-x2").textContent = fmt.n(opt.x2);
+  document.getElementById("m-u").textContent  = fmt.n(opt.u);
+  document.getElementById("m-um1").textContent = isFinite(r1) ? fmt.n(r1, 3) : "—";
+  document.getElementById("m-um2").textContent = isFinite(r2) ? fmt.n(r2, 3) : "—";
+  document.getElementById("m-uex").textContent = fmt.n(uex);
+
+  const tmsOpt = f.tms(opt.x1, opt.x2, p);
+  document.getElementById("algebra").innerHTML =
+    '<div class="step">Condición de tangencia:  TMS = p₁/p₂</div>' +
+    '<div class="step">p₁/p₂ = ' + fmt.n(s.p1 / s.p2, 3) +
+      (isFinite(tmsOpt) ? '   TMS en el óptimo = <span class="res">' + fmt.n(tmsOpt, 3) + '</span>'
+                        : '   TMS no definida (vértice)') + '</div>' +
+    '<div class="step">En la cesta explorada:  UM₁/p₁ = ' + (isFinite(r1) ? fmt.n(r1, 3) : "—") +
+      '   UM₂/p₂ = ' + (isFinite(r2) ? fmt.n(r2, 3) : "—") + '</div>' +
+    '<div class="step">Gasto: p₁x₁ + p₂x₂ = ' + fmt.n(s.p1 * opt.x1 + s.p2 * opt.x2) +
+      '  =  m = ' + fmt.n(s.m, 0) + '</div>';
+
+  const nota = document.getElementById("note");
+  if (opt.esquina) {
+    nota.textContent = "Esta es una solución de esquina: la condición de tangencia no se cumple. " +
+      (fam === "sust"
+        ? "Con sustitutos perfectos el consumidor compara α/p₁ con (1−α)/p₂ y gasta todo en el bien que rinde más por peso."
+        : "El óptimo queda en el borde del conjunto presupuestario, con consumo cero de uno de los bienes.");
+  } else if (fam === "compl") {
+    nota.textContent = "Con complementos perfectos el óptimo está en el vértice de la curva, sobre la diagonal x₁ = x₂. " +
+      "No hay tangencia porque la curva no tiene pendiente ahí, pero igual es el punto más alto alcanzable.";
+  } else if (Math.abs(r1 - r2) < 1e-6) {
+    nota.textContent = "Estás justo en el óptimo: la utilidad marginal por peso gastado es la misma en los dos bienes, " +
+      "así que mover un peso de un bien al otro no mejora nada.";
+  } else if (r1 > r2) {
+    nota.textContent = "En la cesta que exploras UM₁/p₁ > UM₂/p₂: el último peso gastado rinde más en el bien 1, " +
+      "así que al consumidor le conviene comprar más bien 1 y menos bien 2. Mueve el slider hacia la derecha.";
+  } else {
+    nota.textContent = "En la cesta que exploras UM₂/p₂ > UM₁/p₁: conviene mover gasto hacia el bien 2. " +
+      "Mueve el slider hacia la izquierda y observa cómo la curva punteada sube hasta tocar la del óptimo.";
+  }
+}
+
+bindSliders(state, render, format);
+bindTabs(state, "tab", render);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m24-eleccion-optima" });
+</script>
+</body>
+</html>

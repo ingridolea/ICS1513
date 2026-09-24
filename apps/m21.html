@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Progresividad y regresividad del sistema tributario — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Progresividad y regresividad del sistema tributario</h1>
+  <span>M21 &middot; Sistema de impuestos</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tool-btn" data-preset="chile">Mezcla tipo Chile</button>
+    <button class="tool-btn" data-preset="soloiva">Solo IVA</button>
+    <button class="tool-btn" data-preset="progre">M&aacute;s peso en la renta</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Tasa efectiva seg&uacute;n el ingreso &mdash; ilustraci&oacute;n</div>
+      <canvas id="c-main"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Recaudaci&oacute;n del Gobierno central en Chile, 2019</div>
+      <canvas id="c-comp"></canvas>
+      <div class="panel-note">Fuente: PNUD Am&eacute;rica Latina y el Caribe, &laquo;An&aacute;lisis del sistema tributario chileno&raquo;,
+        Serie de Documentos de Pol&iacute;tica P&uacute;blica N.&ordm; 47, 2024.</div>
+    </div>
+  </div>
+
+  <div class="panel-note" id="note" style="padding:0 4px"></div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-dwl-line)" stroke-width="2.5"/></svg>IVA &mdash; impuesto indirecto</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Impuesto a la renta &mdash; directo y progresivo</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-txt)" stroke-width="2.5"/></svg>Carga total</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Impuesto indirecto (IVA)</div>
+        <div class="sr"><div class="sh"><span class="sn">Tasa de IVA</span><span class="sv" id="v-iva">19%</span></div>
+          <input type="range" data-p="iva" min="0" max="30" step="1" value="19"></div>
+        <div class="sr"><div class="sh"><span class="sn">Fracci&oacute;n del ingreso que consume el grupo m&aacute;s rico</span><span class="sv" id="v-cmin">55%</span></div>
+          <input type="range" data-p="cmin" min="20" max="100" step="5" value="55"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Impuesto directo (renta)</div>
+        <div class="sr"><div class="sh"><span class="sn">Tasa sobre el ingreso imponible</span><span class="sv" id="v-renta">25%</span></div>
+          <input type="range" data-p="renta" min="0" max="45" step="1" value="25"></div>
+        <div class="sr"><div class="sh"><span class="sn">Tramo exento (como m&uacute;ltiplo del ingreso m&aacute;s bajo)</span><span class="sv" id="v-exento">3.0</span></div>
+          <input type="range" data-p="exento" min="0" max="8" step="0.5" value="3"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Advertencia</div>
+        <div class="panel-note">El panel izquierdo es una <b>ilustraci&oacute;n</b> de c&oacute;mo se comportan un impuesto indirecto
+          y uno directo, no una estimaci&oacute;n de la carga tributaria real en Chile. El grupo m&aacute;s rico gana 10 veces
+          lo que el m&aacute;s pobre y consume una fracci&oacute;n menor de su ingreso.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Tasa efectiva total</div>
+      <div class="metric"><div class="ml">Grupo de menor ingreso</div><div class="mv" id="m-pobre">&mdash;</div></div>
+      <div class="metric"><div class="ml">Grupo de mayor ingreso</div><div class="mv" id="m-rico">&mdash;</div></div>
+      <div class="metric"><div class="ml">Diferencia</div><div class="mv" id="m-dif">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Diagn&oacute;stico</div>
+      <div class="metric"><div class="ml">El sistema resulta</div><div class="mv" id="m-tipo">&mdash;</div></div>
+      <div class="metric"><div class="ml">Aporte del IVA al total</div><div class="mv" id="m-peso">&mdash;</div></div>
+      <div class="metric"><div class="ml">Recaudaci&oacute;n (&iacute;ndice)</div><div class="mv" id="m-rec">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindPresets, initTools } = ICS;
+
+const defaults = { iva: 19, cmin: 55, renta: 25, exento: 3 };
+const state    = Object.assign({}, defaults);
+
+const presets = {
+  chile:   { iva: 19, cmin: 55, renta: 25, exento: 3 },
+  soloiva: { iva: 25, cmin: 55, renta: 0,  exento: 0 },
+  progre:  { iva: 10, cmin: 55, renta: 38, exento: 3 }
+};
+
+const format = { iva: v => v.toFixed(0) + "%", cmin: v => v.toFixed(0) + "%",
+                 renta: v => v.toFixed(0) + "%", exento: v => v.toFixed(1) };
+
+const plot  = new Plot("c-main", { height: 340 });
+const pcomp = new Plot("c-comp", { height: 340, pad: { l: 148, r: 40, t: 28, b: 42 } });
+
+// Recaudación del Gobierno central por tipo de impuesto, Chile 2019 (PNUD, 2024)
+const COMPOSICION = [
+  ["IVA", 46, "var(--c-dwl-line)"],
+  ["Impuestos a la renta", 41, "var(--c-supply)"],
+  ["Productos específicos", 8, "var(--c-cs-line)"],
+  ["Actos jurídicos", 2, "var(--c-fiscal-line)"],
+  ["Impuestos varios", 2, "var(--c-indif)"],
+  ["Comercio exterior", 1, "var(--c-muted)"]
+];
+
+const GRUPOS = 10;
+const ingreso = i => 1 + (10 - 1) * i / (GRUPOS - 1);   // del más pobre (1) al más rico (10)
+
+function render() {
+  const s = state;
+  const tIva = s.iva / 100, cMin = s.cmin / 100, tRenta = s.renta / 100;
+
+  // fracción del ingreso destinada a consumo: cae con el ingreso
+  const consumo = y => 1 - (1 - cMin) * (y - 1) / 9;
+  // el IVA va incluido en el precio, así que sobre el gasto recae t/(1+t)
+  const tasaIva = y => (tIva / (1 + tIva)) * consumo(y);
+  const tasaRenta = y => tRenta * Math.max(0, y - s.exento) / y;
+  const tasaTotal = y => tasaIva(y) + tasaRenta(y);
+
+  /* ---------- panel izquierdo: tasas efectivas ---------- */
+  const maxTasa = Math.max(0.05, ...Array.from({ length: GRUPOS }, (_, i) => tasaTotal(ingreso(i)))) * 1.25;
+  plot.begin(10.6, maxTasa).grid()
+      .axes("Ingreso (múltiplos del más bajo)", "Tasa efectiva sobre el ingreso",
+            { fmt: v => v < 1 ? (100 * v).toFixed(0) + "%" : v.toFixed(0) });
+
+  const serie = fn => Array.from({ length: 61 }, (_, i) => {
+    const y = 1 + 9 * i / 60; return [y, fn(y)];
+  });
+  plot.poly(serie(tasaIva),   C.dwlLine, { width: 2.2 });
+  plot.poly(serie(tasaRenta), C.supply,  { width: 2.2 });
+  plot.poly(serie(tasaTotal), C.txt,     { width: 2.8 });
+
+  // puntos de los diez grupos sobre la carga total
+  for (let i = 0; i < GRUPOS; i++) {
+    const y = ingreso(i);
+    plot.dot(y, tasaTotal(y), C.txt, 2.8);
+  }
+
+  plot.label(9.6, tasaIva(9.6),   "IVA",   C.dwlLine, { dy: 14, align: "right", box: true });
+  plot.label(9.6, tasaRenta(9.6), "Renta", C.supply,  { dy: -7, align: "right", box: true });
+  plot.label(5.2, tasaTotal(5.2), "Total", C.txt,     { dy: -8, align: "center", box: true });
+
+  /* ---------- panel derecho: composición real ---------- */
+  pcomp.begin(50, COMPOSICION.length);
+  const ctx = pcomp.ctx;
+  ctx.strokeStyle = C.axis; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(pcomp.pad.l, pcomp.pad.t);
+  ctx.lineTo(pcomp.pad.l, pcomp.pad.t + pcomp.gH);
+  ctx.stroke();
+
+  COMPOSICION.forEach(([nombre, pct, color], i) => {
+    const alto = pcomp.gH / COMPOSICION.length;
+    const y0 = pcomp.pad.t + i * alto + alto * 0.18;
+    const h  = alto * 0.64;
+    const w  = (pct / 50) * pcomp.gW;
+    ctx.fillStyle = getComputedStyle(document.documentElement)
+      .getPropertyValue(color.replace("var(", "").replace(")", "")).trim() || color;
+    ctx.fillRect(pcomp.pad.l, y0, w, h);
+    ctx.fillStyle = C.txt; ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(nombre, pcomp.pad.l - 8, y0 + h / 2 + 4);
+    ctx.textAlign = "left";
+    ctx.fillText(pct + "%", pcomp.pad.l + w + 6, y0 + h / 2 + 4);
+  });
+  ctx.fillStyle = C.muted; ctx.textAlign = "left";
+  ctx.fillText("Porcentaje de la recaudación total", pcomp.pad.l, pcomp.pad.t + pcomp.gH + 26);
+
+  /* ---------- números ---------- */
+  const tPobre = tasaTotal(1), tRico = tasaTotal(10);
+  const recaudacion = Array.from({ length: GRUPOS }, (_, i) => {
+    const y = ingreso(i); return tasaTotal(y) * y;
+  }).reduce((a, b) => a + b, 0);
+  const recIva = Array.from({ length: GRUPOS }, (_, i) => {
+    const y = ingreso(i); return tasaIva(y) * y;
+  }).reduce((a, b) => a + b, 0);
+
+  document.getElementById("m-pobre").textContent = fmt.pct(tPobre);
+  document.getElementById("m-rico").textContent  = fmt.pct(tRico);
+  document.getElementById("m-dif").textContent   =
+    (tRico >= tPobre ? "+" : "") + (100 * (tRico - tPobre)).toFixed(1) + " pp";
+  document.getElementById("m-tipo").textContent  =
+    tRico > tPobre + 0.005 ? "progresivo" : tRico < tPobre - 0.005 ? "regresivo" : "proporcional";
+  document.getElementById("m-peso").textContent  = recaudacion > 0 ? fmt.pct(recIva / recaudacion) : "—";
+  document.getElementById("m-rec").textContent   = fmt.n(recaudacion);
+
+  const nota = document.getElementById("note");
+  if (tRico < tPobre - 0.005) {
+    nota.textContent =
+      "Con esta mezcla el sistema resulta regresivo: el grupo de menor ingreso entrega el " + fmt.pct(tPobre) +
+      " de lo que gana y el de mayor ingreso solo el " + fmt.pct(tRico) + ". La razón es el IVA: como los hogares de menores " +
+      "ingresos consumen casi todo lo que ganan, un impuesto sobre el consumo les pesa proporcionalmente más. " +
+      "Sube la tasa del impuesto a la renta y verás cómo la curva total se da vuelta.";
+  } else if (tRico > tPobre + 0.005) {
+    nota.textContent =
+      "El sistema resulta progresivo: la tasa efectiva sube con el ingreso (" + fmt.pct(tPobre) + " contra " +
+      fmt.pct(tRico) + "). El impuesto a la renta, con su tramo exento, es lo que empuja la curva total hacia arriba " +
+      "y compensa el carácter regresivo del IVA.";
+  } else {
+    nota.textContent =
+      "Con estos parámetros la carga total es prácticamente proporcional: todos los grupos entregan la misma fracción " +
+      "de su ingreso. Es el punto de equilibrio entre un IVA regresivo y un impuesto a la renta progresivo.";
+  }
+}
+
+bindSliders(state, render, format);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m21-progresividad" });
+</script>
+</body>
+</html>

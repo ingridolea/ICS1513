@@ -12,6 +12,8 @@ para proyectar en clase en vez de mostrar la lámina estática.
 index.html          Shell: menú lateral, modo presentación, ancla en la URL
 apps/shared.css     Estilos comunes
 apps/shared.js      Plot: dibuja en coordenadas de mercado (Q, P), no en píxeles
+apps/consumo.js     Motor de teoría del consumidor: familias de preferencias,
+                    demandas marshallianas y descomposición de Slutsky
 apps/mNN.html       Un módulo por archivo
 ics1513_apps.html   Versión anterior, intacta, para los links ya repartidos
 ```
@@ -46,6 +48,38 @@ Sitio estático puro: sin build, sin dependencias, sin backend.
 | M15 | Subsidio: excedentes y gasto fiscal | La cuña al revés; el excedente total cae igual |
 | M16 | Ejercicio propuesto no lineal | Qs = √(10P) − 1, Qd = (100 − P)/P, con solución |
 
+**Comercio internacional** (Tema 08)
+
+| | Módulo | Qué hace |
+|---|---|---|
+| M19 | País exportador e importador | Precio mundial, flujos de comercio, quién gana y quién pierde |
+| M20 | Aranceles de importación | Áreas A–G, recaudación y los dos triángulos de pérdida social |
+
+**Sistema tributario** (Tema 09)
+
+| | Módulo | Qué hace |
+|---|---|---|
+| M21 | Progresividad y regresividad | Tasa efectiva por nivel de ingreso, más la composición real de la recaudación chilena |
+
+**Decisiones del consumidor** (Tema 10)
+
+| | Módulo | Qué hace |
+|---|---|---|
+| M22 | Curvas de indiferencia y TMS | Cinco familias de preferencias, con tangente y conjunto preferido |
+| M23 | Restricción presupuestaria | Pendiente −p₁/p₂, racionamiento, impuesto al exceso y subsidio |
+| M24 | Elección óptima | Tangencia TMS = p₁/p₂ y utilidad marginal por peso gastado |
+| M25 | Demanda marshalliana | De la cesta óptima a la curva de demanda, vía la curva de oferta-precio |
+| M26 | Cambios en el ingreso y curva de Engel | Renta-consumo, elasticidad ingreso, bienes de necesidad |
+| M27 | Efecto sustitución, efecto ingreso y Slutsky | X → Y → Z con recta pivotada; demanda compensada frente a la marshalliana |
+| M28 | Bienes normales, inferiores y Giffen | Qué pasa cuando el efecto ingreso se come al de sustitución |
+| M29 | Ejercicio de descomposición | x₁* = 10 + m/(10p₁), con p₁ de 1 a 0,8 y solución paso a paso |
+
+**Economía del comportamiento** (Tema 11)
+
+| | Módulo | Qué hace |
+|---|---|---|
+| M30 | Efecto de presentación | El dilema de la enfermedad: elige, revela y compara |
+
 **Fallas de mercado** (módulos previos del repo)
 
 | | Módulo |
@@ -60,6 +94,13 @@ Sitio estático puro: sin build, sin dependencias, sin backend.
 - Cada módulo tiene **Reiniciar** y **Descargar PNG**.
 - La URL lleva el ancla del módulo, por ejemplo
   `ingridolea.github.io/ICS1513/#m13`, para enlazar desde una diapositiva.
+
+## Una nota sobre el módulo de Slutsky
+
+M27 usa la compensación **de Slutsky**, no la de Hicks: la renta compensada m′ = m + x₁(p₁′ − p₁)
+deja alcanzable la cesta *original*, que es exactamente como lo plantea la lámina del curso.
+Por eso la recta pivotada pasa por X y el punto Y queda en una curva de indiferencia distinta
+de la de X. Todo se deriva de la función de utilidad de cada familia: los puntos no están puestos a mano.
 
 ## Convenciones de color
 

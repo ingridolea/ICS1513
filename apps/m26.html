@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cambios en el ingreso: renta-consumo y curva de Engel — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Cambios en el ingreso: curva renta-consumo y curva de Engel</h1>
+  <span>M26 &middot; Decisiones de los consumidores</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="cobb">Cobb-Douglas</button>
+    <button class="tab" data-tab="geary">Necesidad</button>
+    <button class="tab" data-tab="cuasi">Cuasilineal</button>
+    <button class="tab" data-tab="compl">Complementos</button>
+    <span class="spacer"></span>
+    <button class="chip" data-layer="abanico"><span class="dot" style="background:var(--c-muted)"></span>Rectas paralelas</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Cestas &oacute;ptimas y curva renta-consumo</div>
+      <canvas id="c-cestas"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Curva de Engel &nbsp;x&#8321;*(m)</div>
+      <canvas id="c-engel"></canvas>
+    </div>
+  </div>
+
+  <div class="panel-note" id="note" style="padding:0 4px"></div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Recta presupuestaria al ingreso actual</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-indif)" stroke-width="2.5"/></svg>Curva de indiferencia del &oacute;ptimo</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Curva renta-consumo</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Lo que hacemos variar</div>
+        <div class="sr"><div class="sh"><span class="sn">Ingreso (m)</span><span class="sv" id="v-m">120</span></div>
+          <input type="range" data-p="m" min="20" max="260" step="5" value="120"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Precios fijos</div>
+        <div class="sr"><div class="sh"><span class="sn">Precio del bien 1 (p&#8321;)</span><span class="sv" id="v-p1">2.00</span></div>
+          <input type="range" data-p="p1" min="0.5" max="6" step="0.1" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Precio del bien 2 (p&#8322;)</span><span class="sv" id="v-p2">2.00</span></div>
+          <input type="range" data-p="p2" min="0.5" max="6" step="0.1" value="2"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label" id="gl-par">Preferencias</div>
+        <div class="sr" id="sr-par"><div class="sh"><span class="sn" id="sn-par">&alpha;</span><span class="sv" id="v-par">0.50</span></div>
+          <input type="range" data-p="par" min="0.15" max="0.85" step="0.05" value="0.5"></div>
+        <div class="panel-note" id="nota-fam"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Al ingreso actual</div>
+      <div class="metric"><div class="ml">x&#8321;*</div><div class="mv" id="m-x1">&mdash;</div></div>
+      <div class="metric"><div class="ml">x&#8322;*</div><div class="mv" id="m-x2">&mdash;</div></div>
+      <div class="metric"><div class="ml">Fracci&oacute;n del gasto en bien 1</div><div class="mv" id="m-frac">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Respuesta al ingreso</div>
+      <div class="metric"><div class="ml">Si m sube 10%</div><div class="mv" id="m-sube">&mdash;</div></div>
+      <div class="metric"><div class="ml">Elasticidad ingreso</div><div class="mv" id="m-elast">&mdash;</div></div>
+      <div class="metric"><div class="ml">Tipo de bien</div><div class="mv" id="m-tipo">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script src="consumo.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, bindTabs, initTools } = ICS;
+const { FAM, optimo, dibujarCurva, recta } = Consumo;
+
+const defaults = { m: 120, p1: 2, p2: 2, par: 0.5, tab: "cobb" };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { abanico: true };
+const layers        = Object.assign({}, layerDefaults);
+
+const format = { m: v => v.toFixed(0), p1: v => v.toFixed(2), p2: v => v.toFixed(2), par: v => v.toFixed(2) };
+
+const pCes = new Plot("c-cestas", { height: 360 });
+const pEng = new Plot("c-engel",  { height: 360 });
+
+const M_LO = 20, M_HI = 260;
+
+let familiaPrevia = null;
+function sincronizarPar() {
+  const f = FAM[state.tab], fila = document.getElementById("sr-par");
+  if (familiaPrevia !== state.tab) {
+    if (f.slider) state.par = f.par[f.slider.clave];
+    familiaPrevia = state.tab;
+  }
+  if (!f.slider) { fila.style.display = "none"; return {}; }
+  fila.style.display = "";
+  const inp = fila.querySelector("input");
+  inp.min = f.slider.min; inp.max = f.slider.max; inp.step = f.slider.paso;
+  inp.value = state.par;
+  document.getElementById("sn-par").textContent = f.slider.rotulo;
+  document.getElementById("v-par").textContent = format.par(state.par);
+  return { [f.slider.clave]: state.par };
+}
+
+function render() {
+  const s = state, fam = s.tab, f = FAM[fam];
+  const par = sincronizarPar();
+
+  document.getElementById("gl-par").textContent = "Preferencias — " + f.nombre;
+  document.getElementById("nota-fam").textContent = f.nota;
+
+  const opt = optimo(fam, s.p1, s.p2, s.m, par);
+
+  // lugar de los óptimos al variar el ingreso, y la curva de Engel
+  const lugar = [], engel = [];
+  for (let i = 0; i <= 120; i++) {
+    const mm = M_LO + (M_HI - M_LO) * i / 120;
+    const o = optimo(fam, s.p1, s.p2, mm, par);
+    if (isFinite(o.x1) && isFinite(o.x2)) { lugar.push([o.x1, o.x2]); engel.push([o.x1, mm]); }
+  }
+
+  /* ---------- panel izquierdo ---------- */
+  const maxX1 = (M_HI / s.p1) * 0.62, maxX2 = (M_HI / s.p2) * 0.62;
+  pCes.begin(maxX1, maxX2).grid()
+      .axes("Bien 1  (x₁)", "Bien 2  (x₂)", { skipQ: [opt.x1], skipP: [opt.x2] });
+
+  if (layers.abanico)
+    [0.55, 0.8, 1.25, 1.6].forEach(k => {
+      const mm = s.m * k;
+      if (mm >= M_LO && mm <= M_HI) recta(pCes, s.p1, s.p2, mm, "rgba(66,66,67,0.22)", { width: 1.2 });
+    });
+
+  pCes.poly(lugar, C.supply, { width: 2.2 });
+  dibujarCurva(pCes, fam, opt.u, par, C.indif, { width: 2 });
+  recta(pCes, s.p1, s.p2, s.m, C.demand, { width: 2.4 });
+
+  pCes.seg(opt.x1, 0, opt.x1, opt.x2, C.muted, { dash: [3, 3], width: 0.9 });
+  pCes.dot(opt.x1, opt.x2, C.txt);
+  pCes.tickQ(opt.x1, "x₁*", C.txt);
+  pCes.label(opt.x1, opt.x2, "óptimo", C.txt, { dx: 7, dy: -8, bold: true, box: true });
+  pCes.label(maxX1 * 0.96, maxX2 * 0.92, "Renta-consumo", C.supply, { align: "right", box: true });
+
+  /* ---------- panel derecho: Engel ---------- */
+  const maxQe = Math.max(...engel.map(e => e[0]).filter(isFinite)) * 1.1;
+  pEng.begin(maxQe, M_HI * 1.05).grid()
+      .axes("Bien 1  (x₁)", "Ingreso m", { skipQ: [opt.x1], skipP: [s.m], fmt: v => v.toFixed(0) });
+  pEng.poly(engel, C.supply, { width: 2.6 });
+  pEng.seg(0, s.m, opt.x1, s.m, C.muted, { dash: [3, 3], width: 0.9 });
+  pEng.seg(opt.x1, 0, opt.x1, s.m, C.muted, { dash: [3, 3], width: 0.9 });
+  pEng.dot(opt.x1, s.m, C.txt);
+  pEng.tickP(s.m, "m", C.txt);
+  pEng.tickQ(opt.x1, "x₁*", C.txt);
+  pEng.label(maxQe * 0.96, M_HI * 0.85, "Curva de Engel", C.supply, { align: "right", box: true });
+
+  /* ---------- números ---------- */
+  const mas = optimo(fam, s.p1, s.p2, s.m * 1.1, par).x1;
+  const elast = (mas - opt.x1) / opt.x1 / 0.1;
+  document.getElementById("m-x1").textContent   = fmt.n(opt.x1);
+  document.getElementById("m-x2").textContent   = fmt.n(opt.x2);
+  document.getElementById("m-frac").textContent = fmt.pct(s.p1 * opt.x1 / s.m);
+  document.getElementById("m-sube").textContent = fmt.n(mas) + "  (" + (mas > opt.x1 ? "+" : "") + fmt.n(mas - opt.x1) + ")";
+  document.getElementById("m-elast").textContent = isFinite(elast) ? fmt.n(elast) : "—";
+  document.getElementById("m-tipo").textContent =
+    !isFinite(elast) ? "—" :
+    elast < -0.02 ? "inferior" :
+    elast < 0.02  ? "sin efecto ingreso" :
+    elast < 0.98  ? "normal, de necesidad" :
+    elast > 1.02  ? "normal, de lujo" : "normal, elasticidad 1";
+
+  const nota = document.getElementById("note");
+  if (fam === "cobb") {
+    nota.textContent = "Con Cobb-Douglas la curva renta-consumo es un rayo desde el origen y la de Engel es una recta: " +
+      "la demanda x₁* = α·m/p₁ crece proporcionalmente al ingreso, así que la elasticidad ingreso es exactamente 1 " +
+      "y la fracción del gasto no cambia nunca.";
+  } else if (fam === "geary") {
+    nota.textContent = "El consumidor cubre primero γ = " + fmt.n(state.par, 0) + " unidades del bien 1 y solo reparte el resto. " +
+      "Por eso la curva de Engel no pasa por el origen: parte en γ y sube con pendiente constante. La elasticidad ingreso es menor " +
+      "que 1, que es justamente la definición de un bien de primera necesidad: al subir el ingreso se gasta en él una fracción cada vez menor.";
+  } else if (fam === "cuasi") {
+    nota.textContent = "Con preferencias cuasilineales la curva de Engel es vertical en el tramo interior: por más ingreso que reciba, " +
+      "el consumidor mantiene x₁ y destina todo el aumento al bien 2. El efecto ingreso sobre el bien 1 es cero — " +
+      "eso es lo que hace tan limpio el caso en M27.";
+  } else {
+    nota.textContent = "Con complementos perfectos la curva renta-consumo es la diagonal x₁ = x₂ y la de Engel es una recta por el origen: " +
+      "x₁* = m/(p₁+p₂) crece proporcionalmente al ingreso.";
+  }
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+bindTabs(state, "tab", render);
+initTools({ state, defaults, layers, layerDefaults, format, render,
+            canvas: "c-cestas", file: "m26-ingreso-engel" });
+</script>
+</body>
+</html>

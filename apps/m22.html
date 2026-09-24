@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Curvas de indiferencia y TMS — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Curvas de indiferencia y tasa marginal de sustituci&oacute;n</h1>
+  <span>M22 &middot; Decisiones de los consumidores</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="cobb">Cobb-Douglas</button>
+    <button class="tab" data-tab="sust">Sustitutos perfectos</button>
+    <button class="tab" data-tab="compl">Complementos perfectos</button>
+    <button class="tab" data-tab="cuasi">Cuasilineal</button>
+    <button class="tab" data-tab="geary">Necesidad</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="top-bar">
+    <button class="chip" data-layer="preferido"><span class="dot" style="background:var(--c-cs-line)"></span>Conjunto preferido d&eacute;bilmente</button>
+    <button class="chip" data-layer="tangente"><span class="dot" style="background:var(--c-policy)"></span>Tangente (TMS) en la cesta</button>
+    <button class="chip" data-layer="mapa"><span class="dot" style="background:var(--c-indif)"></span>Mapa de curvas</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Mapa de indiferencia</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Cesta observada</div>
+        <div class="sr"><div class="sh"><span class="sn">x&#8321; de la cesta</span><span class="sv" id="v-x1">20.0</span></div>
+          <input type="range" data-p="x1" min="2" max="55" step="0.5" value="20"></div>
+        <div class="sr"><div class="sh"><span class="sn">x&#8322; de la cesta</span><span class="sv" id="v-x2">20.0</span></div>
+          <input type="range" data-p="x2" min="2" max="55" step="0.5" value="20"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label" id="gl-par">Preferencias</div>
+        <div class="sr" id="sr-par"><div class="sh"><span class="sn" id="sn-par">&alpha;</span><span class="sv" id="v-par">0.50</span></div>
+          <input type="range" data-p="par" min="0.15" max="0.85" step="0.05" value="0.5"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Detalle</div>
+        <div class="panel-note" id="nota-fam"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">En la cesta elegida</div>
+      <div class="metric"><div class="ml">Utilidad U(x&#8321;,x&#8322;)</div><div class="mv" id="m-u">&mdash;</div></div>
+      <div class="metric"><div class="ml">TMS = UM&#8321;/UM&#8322;</div><div class="mv" id="m-tms">&mdash;</div></div>
+      <div class="metric"><div class="ml">Pendiente de la curva</div><div class="mv" id="m-pend">&mdash;</div></div>
+    </div>
+    <div class="mgroup">
+      <div class="mgroup-label">Lectura</div>
+      <div class="metric full"><div class="ml">Disposici&oacute;n a entregar bien 2 por una unidad m&aacute;s de bien 1</div><div class="mv" id="m-cambio">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script src="consumo.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, bindTabs, initTools } = ICS;
+const { FAM, dibujarCurva } = Consumo;
+
+const defaults = { x1: 20, x2: 20, par: 0.5, tab: "cobb" };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { preferido: true, tangente: true, mapa: true };
+const layers        = Object.assign({}, layerDefaults);
+
+const format = { x1: v => v.toFixed(1), x2: v => v.toFixed(1), par: v => v.toFixed(2) };
+
+const plot = new Plot("c-main", { height: 400 });
+const MAXX = 60;
+
+let familiaPrevia = null;
+function sincronizarPar() {
+  const f = FAM[state.tab], fila = document.getElementById("sr-par");
+  if (familiaPrevia !== state.tab) {
+    if (f.slider) state.par = f.par[f.slider.clave];
+    familiaPrevia = state.tab;
+  }
+  if (!f.slider) { fila.style.display = "none"; return {}; }
+  fila.style.display = "";
+  const inp = fila.querySelector("input");
+  inp.min = f.slider.min; inp.max = f.slider.max; inp.step = f.slider.paso;
+  inp.value = state.par;
+  document.getElementById("sn-par").textContent = f.slider.rotulo;
+  document.getElementById("v-par").textContent = format.par(state.par);
+  return { [f.slider.clave]: state.par };
+}
+
+function render() {
+  const s = state, fam = s.tab, f = FAM[fam];
+  const par = sincronizarPar();
+  const p = Object.assign({}, f.par, par);
+
+  document.getElementById("gl-par").textContent = "Preferencias — " + f.nombre;
+  document.getElementById("ptitle").textContent = f.nombre + " · " + f.formula;
+  document.getElementById("nota-fam").textContent = f.nota;
+
+  const u = f.U(s.x1, s.x2, p);
+
+  plot.begin(MAXX, MAXX).grid().axes("Bien 1  (x₁)", "Bien 2  (x₂)", { skipQ: [s.x1], skipP: [s.x2] });
+
+  // conjunto preferido débilmente: todo lo que queda sobre la curva
+  if (layers.preferido) {
+    const pts = f.curva(u, p, MAXX).filter(q => isFinite(q[1]) && q[1] < MAXX * 6);
+    if (pts.length > 1) {
+      const poli = pts.map(q => [q[0], Math.min(q[1], MAXX * 1.4)]);
+      poli.push([MAXX * 1.4, MAXX * 1.4], [poli[0][0], MAXX * 1.4]);
+      plot.area(poli, C.cs);
+    }
+  }
+
+  // mapa de curvas a distintos niveles de utilidad
+  if (layers.mapa) {
+    [0.45, 0.7, 1.35, 1.8].forEach(k => {
+      const niv = fam === "compl" || fam === "sust" ? u * k : u * k;
+      dibujarCurva(plot, fam, niv, par, "rgba(138,92,199,0.32)", { width: 1.4 });
+    });
+  }
+
+  // la curva que pasa por la cesta elegida
+  dibujarCurva(plot, fam, u, par, C.indif, { width: 2.4 });
+
+  // tangente: su pendiente es −TMS
+  const tms = f.tms(s.x1, s.x2, p);
+  if (layers.tangente && isFinite(tms)) {
+    const d = MAXX * 0.16;
+    plot.seg(s.x1 - d, s.x2 + tms * d, s.x1 + d, s.x2 - tms * d, C.policy, { width: 1.8 });
+  }
+
+  plot.seg(s.x1, 0, s.x1, s.x2, C.muted, { dash: [3, 3], width: 0.9 });
+  plot.seg(0, s.x2, s.x1, s.x2, C.muted, { dash: [3, 3], width: 0.9 });
+  plot.dot(s.x1, s.x2, C.txt);
+  plot.tickQ(s.x1, "x₁", C.txt);
+  plot.tickP(s.x2, "x₂", C.txt);
+  plot.label(s.x1, s.x2, "cesta", C.txt, { dx: 8, dy: -8, box: true });
+
+  document.getElementById("m-u").textContent = fmt.n(u);
+  document.getElementById("m-tms").textContent = isFinite(tms) ? fmt.n(tms) : "no definida";
+  document.getElementById("m-pend").textContent = isFinite(tms) ? "−" + fmt.n(tms) : "vértice";
+  document.getElementById("m-cambio").textContent = isFinite(tms)
+    ? fmt.n(tms) + " unidades del bien 2"
+    : "ninguna: los bienes no se sustituyen";
+
+  const nota = document.getElementById("note");
+  if (fam === "compl") {
+    nota.textContent = "En el vértice la TMS no está definida: el consumidor no acepta cambiar un bien por el otro, " +
+      "porque le sirven solo en proporciones fijas. Fuera del vértice, sobrar de un bien no aporta nada.";
+  } else if (fam === "sust") {
+    nota.textContent = "Las curvas son rectas y la TMS es constante (" + fmt.n(tms) + "): da lo mismo en qué punto estemos, " +
+      "el consumidor siempre acepta el mismo intercambio entre los dos bienes.";
+  } else {
+    nota.textContent = "La TMS es la pendiente de la curva de indiferencia en esa cesta: cuántas unidades del bien 2 está " +
+      "dispuesto a entregar por una unidad más del bien 1. Mueve x₁ hacia la derecha y verás que la TMS cae: " +
+      "mientras más bien 1 tiene, menos bien 2 está dispuesto a sacrificar. Eso es la TMS decreciente, y es lo que hace " +
+      "que las curvas sean convexas.";
+  }
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+bindTabs(state, "tab", render);
+initTools({ state, defaults, layers, layerDefaults, format, render,
+            canvas: "c-main", file: "m22-indiferencia-tms" });
+</script>
+</body>
+</html>

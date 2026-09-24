@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bienes normales, inferiores y Giffen — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Bienes normales, inferiores y Giffen</h1>
+  <span>M28 &middot; Decisiones de los consumidores</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tool-btn" data-preset="normal">Bien normal</button>
+    <button class="tool-btn" data-preset="inferior">Inferior, no Giffen</button>
+    <button class="tool-btn" data-preset="giffen">Giffen</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Descomposici&oacute;n sobre el eje del bien 1</div>
+      <canvas id="c-main"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">&iquest;C&oacute;mo queda la demanda?</div>
+      <canvas id="c-dem"></canvas>
+    </div>
+  </div>
+
+  <div class="panel-note" id="note" style="padding:0 4px"></div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-cs-line)" stroke-width="2.5"/></svg>Efecto sustituci&oacute;n &nbsp;X &rarr; Y</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Efecto ingreso &nbsp;Y &rarr; Z</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-txt)" stroke-width="2.5"/></svg>Efecto total &nbsp;X &rarr; Z</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">El precio del bien 1 sube</div>
+        <div class="sr"><div class="sh"><span class="sn">Precio inicial p&#8321;</span><span class="sv" id="v-p1">2.00</span></div>
+          <input type="range" data-p="p1" min="1" max="4" step="0.1" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Precio final p&#8321;&prime;</span><span class="sv" id="v-p1b">3.00</span></div>
+          <input type="range" data-p="p1b" min="1" max="6" step="0.1" value="3"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Efecto sustituci&oacute;n</div>
+        <div class="sr"><div class="sh"><span class="sn">Tama&ntilde;o |&Delta;x&#8321;&#738;| &mdash; siempre reduce el consumo</span><span class="sv" id="v-es">6.0</span></div>
+          <input type="range" data-p="es" min="0" max="14" step="0.5" value="6"></div>
+        <div class="panel-note">El efecto sustituci&oacute;n nunca cambia de signo: si el precio sube, el consumo cae.</div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Efecto ingreso</div>
+        <div class="sr"><div class="sh"><span class="sn">&Delta;x&#8321;&#8319; &mdash; negativo si el bien es normal</span><span class="sv" id="v-ei">-3.0</span></div>
+          <input type="range" data-p="ei" min="-12" max="12" step="0.5" value="-3"></div>
+        <div class="panel-note">Al subir el precio el consumidor es m&aacute;s pobre. Si el bien es normal compra menos; si es inferior, m&aacute;s.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Descomposici&oacute;n</div>
+      <div class="metric"><div class="ml">Efecto sustituci&oacute;n</div><div class="mv" id="m-es">&mdash;</div></div>
+      <div class="metric"><div class="ml">Efecto ingreso</div><div class="mv" id="m-ei">&mdash;</div></div>
+      <div class="metric"><div class="ml">Efecto total</div><div class="mv" id="m-tot">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Diagn&oacute;stico</div>
+      <div class="metric"><div class="ml">Tipo de bien</div><div class="mv" id="m-tipo">&mdash;</div></div>
+      <div class="metric"><div class="ml">Pendiente de la demanda</div><div class="mv" id="m-pend">&mdash;</div></div>
+      <div class="metric"><div class="ml">&part;x&#8321;/&part;p&#8321;</div><div class="mv" id="m-der">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindPresets, initTools } = ICS;
+
+// Partimos de una cesta inicial fija y construimos la descomposición: es la
+// misma construcción de la lámina, con los dos efectos como parámetros.
+const X0 = 30;
+
+const defaults = { p1: 2, p1b: 3, es: 6, ei: -3 };
+const state    = Object.assign({}, defaults);
+
+const presets = {
+  normal:   { p1: 2, p1b: 3, es: 6, ei: -3 },
+  inferior: { p1: 2, p1b: 3, es: 6, ei: 4 },
+  giffen:   { p1: 2, p1b: 3, es: 6, ei: 9 }
+};
+
+const format = { p1: v => v.toFixed(2), p1b: v => v.toFixed(2),
+                 es: v => v.toFixed(1), ei: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 340, pad: { l: 52, r: 22, t: 28, b: 92 } });
+const pdem = new Plot("c-dem",  { height: 340, pad: { l: 52, r: 22, t: 28, b: 92 } });
+
+function render() {
+  const s = state;
+  const sube = s.p1b > s.p1;
+  // el precio sube ⇒ el efecto sustitución reduce el consumo
+  const dSust = sube ? -s.es : s.es;
+  const dIng  = s.ei;
+  const xX = X0, xY = xX + dSust, xZ = xY + dIng;
+  const dTot = xZ - xX;
+
+  const maxX = Math.max(xX, xY, xZ, 10) * 1.35;
+
+  /* ---------- panel izquierdo: los tres puntos sobre el eje ---------- */
+  plot.begin(maxX, 10).grid()
+      .axes("Bien 1  (x₁)", "", { noP: true, skipQ: [xX, xY, xZ] });
+
+  const nivel = 7.2;
+  // barra de referencia donde se apoyan los tres puntos
+  plot.seg(0, nivel, maxX, nivel, C.muted, { width: 1, dash: [3, 3] });
+  [[xX, "X", C.demand, "cesta inicial"],
+   [xY, "Y", C.csLine, "tras sustituir"],
+   [xZ, "Z", C.supply, "cesta final"]].forEach(([x, nom, col, txt]) => {
+    plot.seg(x, 0, x, nivel, col, { width: 1.4, dash: [4, 3] });
+    plot.dot(x, nivel, col, 5);
+    plot.label(x, nivel, nom, C.txt, { dx: 0, dy: -12, bold: true, align: "center", box: true });
+    plot.label(x, nivel, txt, C.muted, { dx: 0, dy: 20, align: "center", box: true });
+    plot.tickQ(x, fmt.n(x, 1), col);
+  });
+
+  plot.spanBelow(xX, xY, 0, "sustitución " + fmt.n(dSust, 1), C.csLine);
+  plot.spanBelow(xY, xZ, 1, "ingreso " + (dIng > 0 ? "+" : "") + fmt.n(dIng, 1), C.supply);
+  plot.spanBelow(xX, xZ, 2, "total " + (dTot > 0 ? "+" : "") + fmt.n(dTot, 1), C.txt);
+
+  /* ---------- panel derecho: los dos puntos de la demanda ---------- */
+  const maxQ = maxX, maxP = Math.max(s.p1, s.p1b) * 1.5;
+  pdem.begin(maxQ, maxP).grid()
+      .axes("Bien 1  (x₁)", "Precio p₁", { skipQ: [xX, xZ], skipP: [s.p1, s.p1b] });
+
+  pdem.seg(xX, s.p1, xZ, s.p1b, dTot * (s.p1b - s.p1) > 0 ? C.dwlLine : C.demand, { width: 2.6 });
+  pdem.seg(0, s.p1,  xX, s.p1,  C.muted, { dash: [3, 3], width: 0.9 });
+  pdem.seg(0, s.p1b, xZ, s.p1b, C.muted, { dash: [3, 3], width: 0.9 });
+  pdem.seg(xX, 0, xX, s.p1,  C.muted, { dash: [3, 3], width: 0.9 });
+  pdem.seg(xZ, 0, xZ, s.p1b, C.muted, { dash: [3, 3], width: 0.9 });
+  pdem.dot(xX, s.p1,  C.demand);
+  pdem.dot(xZ, s.p1b, C.supply);
+  pdem.label(xX, s.p1,  "X", C.txt, { dx: 7, dy: -6, bold: true, box: true });
+  pdem.label(xZ, s.p1b, "Z", C.txt, { dx: 7, dy: -6, bold: true, box: true });
+  pdem.tickP(s.p1,  "p₁",  C.txt);
+  pdem.tickP(s.p1b, "p₁′", C.txt);
+  pdem.tickQ(xX, fmt.n(xX, 1), C.demand);
+  pdem.tickQ(xZ, fmt.n(xZ, 1), C.supply);
+
+  /* ---------- números ---------- */
+  const signo = v => (v > 0 ? "+" : "") + fmt.n(v, 1);
+  const giffen = dTot * (s.p1b - s.p1) > 0.001;
+  const inferior = dIng * (s.p1b - s.p1) > 0.001;
+
+  document.getElementById("m-es").textContent  = signo(dSust);
+  document.getElementById("m-ei").textContent  = signo(dIng);
+  document.getElementById("m-tot").textContent = signo(dTot);
+  document.getElementById("m-tipo").textContent =
+    giffen ? "Giffen" : inferior ? "inferior, no Giffen" : Math.abs(dIng) < 0.05 ? "sin efecto ingreso" : "normal";
+  document.getElementById("m-pend").textContent = giffen ? "positiva" : "negativa";
+  document.getElementById("m-der").textContent  =
+    fmt.n(dTot / (s.p1b - s.p1), 2) + (giffen ? "  > 0" : "  < 0");
+
+  document.getElementById("algebra").innerHTML =
+    '<div class="step">Δx₁ = Δx₁ˢ + Δx₁ⁿ = ' + signo(dSust) + ' + ' + signo(dIng) +
+      ' = <span class="res">' + signo(dTot) + '</span></div>' +
+    '<div class="step">Efecto sustitución: siempre de signo contrario al precio  ⇒  Δp₁ > 0 ⇒ Δx₁ˢ < 0</div>' +
+    '<div class="step">Efecto ingreso: ' + (inferior
+        ? 'positivo aquí, porque el bien es inferior (al empobrecerse, el consumidor compra más)'
+        : 'negativo aquí, porque el bien es normal') + '</div>';
+
+  const nota = document.getElementById("note");
+  if (giffen) {
+    nota.textContent =
+      "Caso Giffen: el bien es inferior y el efecto ingreso (" + signo(dIng) + ") es tan fuerte que se come al efecto " +
+      "sustitución (" + signo(dSust) + "). El resultado neto es que sube el precio y sube la cantidad demandada: " +
+      "∂x₁/∂p₁ > 0 y la demanda tiene pendiente positiva. Es el caso extremo, no una curiosidad frecuente.";
+  } else if (inferior) {
+    nota.textContent =
+      "El bien es inferior: el efecto ingreso empuja en sentido contrario al de sustitución. Pero acá el de sustitución " +
+      "sigue siendo el más fuerte, así que la demanda conserva su pendiente negativa. Un bien inferior no es " +
+      "automáticamente un bien Giffen: hay que mirar cuál de los dos efectos domina.";
+  } else if (Math.abs(dIng) < 0.05) {
+    nota.textContent =
+      "Sin efecto ingreso, todo el cambio es sustitución. Es lo que pasa con preferencias cuasilineales, " +
+      "que puedes ver derivadas desde la utilidad en M27.";
+  } else {
+    nota.textContent =
+      "Bien normal: al subir el precio el consumidor sustituye hacia el otro bien y además se empobrece, " +
+      "y ambos efectos van en la misma dirección. Por eso la demanda baja con seguridad. " +
+      "Mueve el efecto ingreso hacia valores positivos para ver aparecer los casos inferior y Giffen.";
+  }
+}
+
+bindSliders(state, render, format);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m28-giffen" });
+</script>
+</body>
+</html>
