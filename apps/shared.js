@@ -277,6 +277,18 @@
     return this;
   };
 
+  /* Recorta el dibujo al area del grafico: util cuando una recta se sale
+     del encuadre porque los ejes son fijos. Siempre en pares push/pop. */
+  Plot.prototype.push = function () {
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(this.pad.l, this.pad.t, this.gW, this.gH);
+    ctx.clip();
+    return this;
+  };
+  Plot.prototype.pop = function () { this.ctx.restore(); return this; };
+
   /* Rectangulo en coordenadas de mercado */
   Plot.prototype.rect = function (q1, p1, q2, p2, color, edge) {
     return this.area([[q1, p1], [q2, p1], [q2, p2], [q1, p2]], color, edge);

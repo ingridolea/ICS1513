@@ -54,9 +54,9 @@
       <div class="slider-group">
         <div class="group-label">Precio del bien 1</div>
         <div class="sr"><div class="sh"><span class="sn">Precio inicial p&#8321;</span><span class="sv" id="v-p1">2.0</span></div>
-          <input type="range" data-p="p1" min="0.5" max="6" step="0.1" value="2"></div>
+          <input type="range" data-p="p1" min="0.8" max="5" step="0.1" value="2"></div>
         <div class="sr"><div class="sh"><span class="sn">Precio final p&#8321;&prime;</span><span class="sv" id="v-p1b">1.0</span></div>
-          <input type="range" data-p="p1b" min="0.5" max="6" step="0.1" value="1"></div>
+          <input type="range" data-p="p1b" min="0.8" max="5" step="0.1" value="1"></div>
       </div>
       <div class="slider-group">
         <div class="group-label">Resto del mercado</div>
@@ -114,6 +114,8 @@ const format = {
   m: v => v.toFixed(0), par: v => v.toFixed(2)
 };
 
+const P1B_LO = 0.8, P1B_HI = 5;   // topes del slider de p₁′
+
 const plot = new Plot("c-main", { height: 360, pad: { l: 52, r: 22, t: 28, b: 78 } });
 const pdem = new Plot("c-dem",  { height: 360, pad: { l: 52, r: 22, t: 28, b: 78 } });
 
@@ -153,12 +155,15 @@ function render() {
   const { X, Y, Z, mPrima } = sl;
   const bajo = s.p1b < s.p1;
 
-  /* ---------- panel izquierdo: espacio de cestas ---------- */
-  const maxX1 = Math.max(s.m / s.p1, s.m / s.p1b, X.x1, Z.x1) * 1.12;
+  /* ---------- panel izquierdo: espacio de cestas ----------
+     El eje horizontal se fija con el TOPE del slider de p₁′, no con su valor
+     actual: así X queda anclado en pantalla mientras Y y Z se mueven. */
+  const maxX1 = Math.max(s.m / s.p1, optimo(fam, P1B_LO, s.p2, s.m, par).x1) * 1.12;
   const maxX2 = Math.max(mPrima / s.p2, s.m / s.p2, X.x2, Z.x2) * 1.15;
   plot.begin(maxX1, maxX2).grid()
       .axes("Bien 1  (x₁)", "Bien 2  (x₂)", { skipQ: [X.x1, Y.x1, Z.x1] });
 
+  plot.push();
   // curvas de indiferencia por cada cesta
   dibujarCurva(plot, fam, X.u, par, C.indif, { width: 1.6 });
   dibujarCurva(plot, fam, Y.u, par, C.indif, { width: 1.6, dash: [5, 3] });
@@ -168,6 +173,7 @@ function render() {
   recta(plot, s.p1,  s.p2, s.m,     C.demand, { width: 2.2 });
   recta(plot, s.p1b, s.p2, mPrima,  C.csLine, { width: 2, dash: [6, 4] });
   recta(plot, s.p1b, s.p2, s.m,     C.supply, { width: 2.2 });
+  plot.pop();
 
   [[X, "X", C.demand], [Y, "Y", C.csLine], [Z, "Z", C.supply]].forEach(([pt, nom, col]) => {
     plot.seg(pt.x1, 0, pt.x1, pt.x2, C.muted, { dash: [3, 3], width: 0.9 });
@@ -180,11 +186,11 @@ function render() {
   plot.spanBelow(Y.x1, Z.x1, 1, "ingreso", C.supply);
 
   /* ---------- panel derecho: demanda marshalliana y compensada ---------- */
-  const pLo = 0.5, pHi = 6;
+  const pLo = P1B_LO, pHi = P1B_HI;
   const demM = p => optimo(fam, p, s.p2, s.m, par).x1;                       // ingreso fijo
   const demS = p => optimo(fam, p, s.p2, s.m + X.x1 * (p - s.p1), par).x1;   // cesta X alcanzable
 
-  const maxQ2 = Math.max(demM(pLo), demS(pLo), X.x1, Z.x1) * 1.1;
+  const maxQ2 = maxX1;   // misma escala que el panel de cestas
   pdem.begin(maxQ2, pHi * 1.05).grid()
       .axes("Bien 1  (x₁)", "Precio p₁", { skipP: [s.p1, s.p1b], skipQ: [X.x1, Y.x1, Z.x1] });
 
@@ -197,8 +203,10 @@ function render() {
     }
     pdem.poly(pts, col, o);
   };
+  pdem.push();
   muestreo(demS, C.csLine, { width: 2, dash: [6, 4] });
   muestreo(demM, C.demand, { width: 2.4 });
+  pdem.pop();
 
   pdem.seg(0, s.p1,  maxQ2, s.p1,  C.muted, { dash: [3, 3], width: 0.9 });
   pdem.seg(0, s.p1b, maxQ2, s.p1b, C.muted, { dash: [3, 3], width: 0.9 });

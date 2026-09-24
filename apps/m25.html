@@ -53,7 +53,7 @@
       <div class="slider-group">
         <div class="group-label">Precio que hacemos variar</div>
         <div class="sr"><div class="sh"><span class="sn">Precio del bien 1 (p&#8321;)</span><span class="sv" id="v-p1">2.00</span></div>
-          <input type="range" data-p="p1" min="0.4" max="6" step="0.05" value="2"></div>
+          <input type="range" data-p="p1" min="0.8" max="5" step="0.05" value="2"></div>
       </div>
       <div class="slider-group">
         <div class="group-label">Lo que se mantiene fijo</div>
@@ -107,7 +107,7 @@ const format = { p1: v => v.toFixed(2), p2: v => v.toFixed(2), m: v => v.toFixed
 const pCes = new Plot("c-cestas", { height: 360 });
 const pDem = new Plot("c-dem",    { height: 360 });
 
-const P_LO = 0.4, P_HI = 6;
+const P_LO = 0.8, P_HI = 5;
 
 let familiaPrevia = null;
 function sincronizarPar() {
@@ -143,15 +143,18 @@ function render() {
     if (isFinite(o.x1) && isFinite(o.x2)) { lugar.push([o.x1, o.x2]); demanda.push([o.x1, p]); }
   }
 
-  /* ---------- panel izquierdo ---------- */
-  const xTope = Math.min(s.m / P_LO, s.m / Math.max(s.p1 * 0.35, P_LO)) * 1.05;
-  const maxX1 = Math.max(opt.x1 * 1.6, s.m / s.p1 * 1.1, 10);
-  const maxX2 = (s.m / s.p2) * 1.15;
+  /* ---------- panel izquierdo ----------
+     Los ejes NO dependen de p₁: se fijan con todo el recorrido de precios.
+     Si dependieran del precio actual, el óptimo se quedaría clavado en el
+     mismo punto de la pantalla mientras el eje se reescala debajo de él. */
+  const maxX1 = Math.max(...lugar.map(l => l[0]).filter(isFinite)) * 1.08;
+  const maxX2 = Math.max(s.m / s.p2, ...lugar.map(l => l[1]).filter(isFinite)) * 1.12;
   pCes.begin(maxX1, maxX2).grid()
       .axes("Bien 1  (x₁)", "Bien 2  (x₂)", { skipQ: [opt.x1], skipP: [opt.x2] });
 
+  pCes.push();   // las rectas de precios bajos se salen del encuadre
   if (layers.abanico) {
-    [0.5, 0.75, 1.5, 2.5].forEach(k => {
+    [0.6, 0.8, 1.4, 2].forEach(k => {
       const p = s.p1 * k;
       if (p >= P_LO && p <= P_HI) recta(pCes, p, s.p2, s.m, "rgba(66,66,67,0.22)", { width: 1.2 });
     });
@@ -159,6 +162,7 @@ function render() {
   pCes.poly(lugar, C.csLine, { width: 2.2 });
   dibujarCurva(pCes, fam, opt.u, par, C.indif, { width: 2 });
   recta(pCes, s.p1, s.p2, s.m, C.demand, { width: 2.4 });
+  pCes.pop();
 
   pCes.seg(opt.x1, 0, opt.x1, opt.x2, C.muted, { dash: [3, 3], width: 0.9 });
   pCes.dot(opt.x1, opt.x2, C.txt);
@@ -167,10 +171,12 @@ function render() {
   pCes.label(maxX1 * 0.96, maxX2 * 0.9, "Oferta-precio", C.csLine, { align: "right", box: true });
 
   /* ---------- panel derecho: la demanda ---------- */
-  const maxQd = Math.max(...demanda.map(d => d[0]).filter(isFinite)) * 1.08;
+  const maxQd = maxX1;   // misma escala que el panel izquierdo
   pDem.begin(maxQd, P_HI * 1.05).grid()
       .axes("Bien 1  (x₁)", "Precio p₁", { skipQ: [opt.x1], skipP: [s.p1] });
+  pDem.push();
   pDem.poly(demanda, C.demand, { width: 2.6 });
+  pDem.pop();
   pDem.seg(0, s.p1, opt.x1, s.p1, C.muted, { dash: [3, 3], width: 0.9 });
   pDem.seg(opt.x1, 0, opt.x1, s.p1, C.muted, { dash: [3, 3], width: 0.9 });
   pDem.dot(opt.x1, s.p1, C.txt);
