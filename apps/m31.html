@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Producto total, marginal y medio — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Producto total, marginal y medio</h1>
+  <span>M31 &middot; Costos de los productores</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="cobb">Cobb-Douglas</button>
+    <button class="tab" data-tab="lineal">Producci&oacute;n lineal</button>
+    <button class="tab" data-tab="fijas">Proporciones fijas</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" data-preset="decrecientes">Rendimientos decrecientes</button>
+    <button class="tool-btn" data-preset="ejercicio">Ejercicio: f = &alpha;k + &beta;l</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Producto total &nbsp;q = f(k, l&#772;)</div>
+      <canvas id="c-total"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Productividad marginal y media del capital</div>
+      <canvas id="c-prod"></canvas>
+    </div>
+  </div>
+
+  <div class="panel-note" id="note" style="padding:0 4px"></div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Producto total &nbsp;q = f(k, l&#772;)</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Productividad marginal &nbsp;PM<sub>k</sub></span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-cs-line)" stroke-width="2.5"/></svg>Productividad media &nbsp;PMe<sub>k</sub></span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Capital</div>
+        <div class="sr"><div class="sh"><span class="sn">Nivel de capital (k)</span><span class="sv" id="v-k">10.0</span></div>
+          <input type="range" data-p="k" min="0.5" max="40" step="0.5" value="10"></div>
+        <div class="sr"><div class="sh"><span class="sn">Trabajo fijo (l&#772;)</span><span class="sv" id="v-lb">10.0</span></div>
+          <input type="range" data-p="lb" min="1" max="30" step="1" value="10"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Tecnolog&iacute;a</div>
+        <div class="sr"><div class="sh"><span class="sn">Escala (A)</span><span class="sv" id="v-A">1.00</span></div>
+          <input type="range" data-p="A" min="0.5" max="3" step="0.1" value="1"></div>
+        <div class="sr"><div class="sh"><span class="sn" id="sn-a">Elasticidad del capital (a)</span><span class="sv" id="v-a">0.50</span></div>
+          <input type="range" data-p="a" min="0.1" max="1.5" step="0.05" value="0.5"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Tecnolog&iacute;a</div>
+        <div class="sr"><div class="sh"><span class="sn" id="sn-b">Elasticidad del trabajo (b)</span><span class="sv" id="v-b">0.50</span></div>
+          <input type="range" data-p="b" min="0.1" max="1.5" step="0.05" value="0.5"></div>
+        <div class="panel-note" id="nota-fam"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">En el nivel de capital elegido</div>
+      <div class="metric"><div class="ml">Producto total q</div><div class="mv" id="m-q">&mdash;</div></div>
+      <div class="metric"><div class="ml">Productividad marginal PM<sub>k</sub></div><div class="mv" id="m-pm">&mdash;</div></div>
+      <div class="metric"><div class="ml">Productividad media PMe<sub>k</sub></div><div class="mv" id="m-pme">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Lectura</div>
+      <div class="metric"><div class="ml">&iquest;PM<sub>k</sub> decreciente?</div><div class="mv" id="m-dec">&mdash;</div></div>
+      <div class="metric"><div class="ml">Comparaci&oacute;n</div><div class="mv" id="m-comp">&mdash;</div></div>
+      <div class="metric"><div class="ml">Una unidad m&aacute;s de capital aporta</div><div class="mv" id="m-extra">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script src="produccion.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindTabs, bindPresets, initTools } = ICS;
+const { FP, productividades } = Produccion;
+
+const defaults = { k: 10, lb: 10, A: 1, a: 0.5, b: 0.5, tab: "cobb" };
+const state    = Object.assign({}, defaults);
+
+const presets = {
+  decrecientes: { tab: "cobb", A: 1, a: 0.5, b: 0.5, lb: 10, k: 10 },
+  ejercicio:    { tab: "lineal", A: 1, a: 1, b: 1, lb: 10, k: 10 }
+};
+
+const format = { k: v => v.toFixed(1), lb: v => v.toFixed(1), A: v => v.toFixed(2),
+                 a: v => v.toFixed(2), b: v => v.toFixed(2) };
+
+const pTot = new Plot("c-total", { height: 350 });
+const pPrd = new Plot("c-prod",  { height: 350 });
+
+const K_MAX = 40;
+
+function render() {
+  const s = state, fam = s.tab, f = FP[fam];
+  const par = { A: s.A, a: s.a, b: s.b };
+
+  document.getElementById("nota-fam").textContent = f.nota;
+  document.getElementById("sn-a").textContent =
+    fam === "cobb" ? "Elasticidad del capital (a)" : fam === "lineal" ? "Coeficiente α del capital" : "Capital por unidad (a)";
+  document.getElementById("sn-b").textContent =
+    fam === "cobb" ? "Elasticidad del trabajo (b)" : fam === "lineal" ? "Coeficiente β del trabajo" : "Trabajo por unidad (b)";
+
+  const act = productividades(fam, s.k, s.lb, par);
+
+  // muestreo de las tres curvas sobre el rango de capital
+  const total = [], marg = [], media = [];
+  for (let i = 1; i <= 240; i++) {
+    const k = K_MAX * i / 240;
+    const d = productividades(fam, k, s.lb, par);
+    if (isFinite(d.q))   total.push([k, d.q]);
+    if (isFinite(d.pm))  marg.push([k, d.pm]);
+    if (isFinite(d.pme)) media.push([k, d.pme]);
+  }
+
+  /* ---------- panel izquierdo: producto total ---------- */
+  const maxQ = Math.max(...total.map(t => t[1]).filter(isFinite)) * 1.12 || 10;
+  pTot.begin(K_MAX, maxQ).grid()
+      .axes("Capital (k)", "Producto (q)", { skipQ: [s.k], skipP: [act.q] });
+  pTot.push();
+  pTot.poly(total, C.supply, { width: 2.6 });
+  pTot.pop();
+
+  // la pendiente en el punto es la productividad marginal;
+  // la pendiente del rayo desde el origen es la productividad media
+  if (isFinite(act.q)) {
+    pTot.seg(0, 0, s.k * 1.55, act.pme * s.k * 1.55, C.csLine, { width: 1.4, dash: [5, 3] });
+    if (isFinite(act.pm)) {
+      const d = K_MAX * 0.16;
+      pTot.seg(s.k - d, act.q - act.pm * d, s.k + d, act.q + act.pm * d, C.demand, { width: 1.8 });
+    }
+    pTot.seg(s.k, 0, s.k, act.q, C.muted, { dash: [3, 3], width: 0.9 });
+    pTot.dot(s.k, act.q, C.txt);
+    pTot.tickQ(s.k, "k", C.txt);
+    pTot.label(s.k, act.q, "q = " + fmt.n(act.q), C.txt, { dx: 7, dy: -8, box: true });
+    pTot.label(s.k * 1.5, act.pme * s.k * 1.5, "rayo: PMe", C.csLine, { dx: 4, dy: 12, align: "right", box: true });
+  }
+
+  /* ---------- panel derecho: marginal y media ---------- */
+  const maxP = Math.max(
+    ...marg.map(m => m[1]).filter(isFinite).slice(5),
+    ...media.map(m => m[1]).filter(isFinite).slice(5)) * 1.2 || 5;
+  pPrd.begin(K_MAX, maxP).grid()
+      .axes("Capital (k)", "Producto por unidad", { skipQ: [s.k] });
+  pPrd.push();
+  pPrd.poly(media, C.csLine, { width: 2.4 });
+  pPrd.poly(marg,  C.demand, { width: 2.6 });
+  pPrd.pop();
+  if (isFinite(act.pm))  pPrd.dot(s.k, act.pm,  C.demand);
+  if (isFinite(act.pme)) pPrd.dot(s.k, act.pme, C.csLine);
+  pPrd.seg(s.k, 0, s.k, Math.max(act.pm || 0, act.pme || 0), C.muted, { dash: [3, 3], width: 0.9 });
+  pPrd.tickQ(s.k, "k", C.txt);
+  pPrd.label(K_MAX * 0.95, maxP * 0.86, "PMe", C.csLine, { align: "right", box: true });
+  pPrd.label(K_MAX * 0.95, maxP * 0.72, "PM",  C.demand, { align: "right", box: true });
+
+  /* ---------- números ---------- */
+  const antes = productividades(fam, Math.max(s.k - 1, 0.1), s.lb, par);
+  const decrece = isFinite(act.pm) && isFinite(antes.pm) ? act.pm < antes.pm - 1e-9 : false;
+  const constante = isFinite(act.pm) && isFinite(antes.pm) && Math.abs(act.pm - antes.pm) < 1e-9;
+
+  document.getElementById("m-q").textContent   = fmt.n(act.q);
+  document.getElementById("m-pm").textContent  = isFinite(act.pm) ? fmt.n(act.pm, 3) : "no definida";
+  document.getElementById("m-pme").textContent = isFinite(act.pme) ? fmt.n(act.pme, 3) : "—";
+  document.getElementById("m-dec").textContent = !isFinite(act.pm) ? "—"
+    : decrece ? "sí" : constante ? "constante" : "no, creciente";
+  document.getElementById("m-comp").textContent = !isFinite(act.pm) ? "—"
+    : act.pme > act.pm + 1e-9 ? "PMe > PM" : act.pme < act.pm - 1e-9 ? "PMe < PM" : "PMe = PM";
+  document.getElementById("m-extra").textContent = isFinite(act.pm) ? fmt.n(act.pm, 3) + " unidades" : "—";
+
+  if (fam === "cobb") {
+    document.getElementById("algebra").innerHTML =
+      '<div class="step">q = A·k^a·l^b = ' + fmt.n(s.A,2) + '·' + fmt.n(s.k,1) + '^' + fmt.n(s.a,2) +
+        '·' + fmt.n(s.lb,1) + '^' + fmt.n(s.b,2) + ' = <span class="res">' + fmt.n(act.q) + '</span></div>' +
+      '<div class="step">PM_k = ∂f/∂k = A·a·k^(a−1)·l^b = <span class="res">' + fmt.n(act.pm, 3) + '</span></div>' +
+      '<div class="step">PMe_k = f/k = <span class="res">' + fmt.n(act.pme, 3) + '</span>' +
+        '   ⇒  PM_k / PMe_k = a = ' + fmt.n(s.a, 2) + '</div>';
+  } else if (fam === "lineal") {
+    document.getElementById("algebra").innerHTML =
+      '<div class="step">q = A·(α·k + β·l̄) = ' + fmt.n(s.A,2) + '·(' + fmt.n(s.a,2) + '·' + fmt.n(s.k,1) +
+        ' + ' + fmt.n(s.b,2) + '·' + fmt.n(s.lb,1) + ') = <span class="res">' + fmt.n(act.q) + '</span></div>' +
+      '<div class="step">PM_k = ∂f/∂k = A·α = <span class="res">' + fmt.n(act.pm, 3) + '</span>   (constante)</div>' +
+      '<div class="step">PMe_k = f/k = A·α + A·β·l̄/k = ' + fmt.n(act.pm, 3) + ' + ' +
+        fmt.n(s.A * s.b * s.lb / s.k, 3) + ' = <span class="res">' + fmt.n(act.pme, 3) + '</span></div>' +
+      '<div class="step">Como el segundo término es positivo:  <span class="res">PMe_k > PM_k</span></div>';
+  } else {
+    document.getElementById("algebra").innerHTML =
+      '<div class="step">q = A·mín{k/a, l̄/b} = <span class="res">' + fmt.n(act.q) + '</span></div>' +
+      '<div class="step">Pasado el punto en que el trabajo se vuelve el cuello de botella, agregar capital no aporta nada: PM_k = 0.</div>';
+  }
+
+  const nota = document.getElementById("note");
+  if (fam === "lineal") {
+    nota.textContent = "Con producción lineal la productividad marginal del capital es constante (A·α = " +
+      fmt.n(act.pm, 3) + "): cada máquina extra aporta siempre lo mismo. La productividad media, en cambio, " +
+      "es siempre mayor, porque reparte entre el capital lo que aporta el trabajo fijo. Por eso PMe_k > PM_k, " +
+      "y la brecha se achica a medida que crece k.";
+  } else if (fam === "fijas") {
+    nota.textContent = "Con proporciones fijas el producto crece mientras el capital sea el factor escaso, y se aplana " +
+      "apenas el trabajo fijo se convierte en el cuello de botella: a partir de ahí la productividad marginal del capital es cero.";
+  } else if (s.a < 1) {
+    nota.textContent = "Con a = " + fmt.n(s.a, 2) + " < 1 se cumple la ley de rendimientos marginales decrecientes: " +
+      "el producto total sigue subiendo, pero cada vez más lento. En el panel derecho la curva PM cae, y como además " +
+      "PM queda por debajo de PMe, la media también va bajando. Ojo con la lectura: que el producto marginal decrezca " +
+      "no significa que la producción caiga.";
+  } else if (s.a > 1) {
+    nota.textContent = "Con a = " + fmt.n(s.a, 2) + " > 1 la productividad marginal del capital es creciente: " +
+      "cada unidad adicional aporta más que la anterior. Es el caso opuesto a los rendimientos decrecientes, " +
+      "y no suele sostenerse en un proceso productivo real.";
+  } else {
+    nota.textContent = "Con a = 1 la productividad marginal del capital es constante: el producto total es una recta " +
+      "en k y cada unidad extra aporta exactamente lo mismo.";
+  }
+}
+
+bindSliders(state, render, format);
+bindTabs(state, "tab", render);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-total", file: "m31-productividad" });
+</script>
+</body>
+</html>

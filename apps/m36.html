@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Costo total, medio y marginal — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Costo total, costo medio y costo marginal</h1>
+  <span>M36 &middot; Costos de los productores</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="cuad">C(q) = F + c&middot;q&sup2;</button>
+    <button class="tab" data-tab="cubica">Costo en forma de U</button>
+    <button class="tab" data-tab="lineal">C(q) = F + c&middot;q</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" data-preset="ejercicio">Ejercicio: C = q&sup2; + 1</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Costo total C(q)</div>
+      <canvas id="c-total"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Costo medio y costo marginal</div>
+      <canvas id="c-unit"></canvas>
+    </div>
+  </div>
+
+  <div class="panel-note" id="note" style="padding:0 4px"></div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Costo total C(q)</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-cs-line)" stroke-width="2.5"/></svg>Costo medio CMe</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Costo marginal CM</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-muted)" stroke-width="2" stroke-dasharray="5 3"/></svg>Rayo desde el origen: su pendiente es el CMe</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Nivel de producci&oacute;n</div>
+        <div class="sr"><div class="sh"><span class="sn">q</span><span class="sv" id="v-q">1.50</span></div>
+          <input type="range" data-p="q" min="0.1" max="6" step="0.05" value="1.5"></div>
+        <div class="sr"><div class="sh"><span class="sn">Costo fijo (F)</span><span class="sv" id="v-F">1.00</span></div>
+          <input type="range" data-p="F" min="0" max="8" step="0.25" value="1"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Par&aacute;metros del costo</div>
+        <div class="sr"><div class="sh"><span class="sn" id="sn-c">Coeficiente c</span><span class="sv" id="v-c">1.00</span></div>
+          <input type="range" data-p="c" min="0.2" max="4" step="0.1" value="1"></div>
+        <div class="sr" id="sr-beta"><div class="sh"><span class="sn">Curvatura (&beta;)</span><span class="sv" id="v-beta">3.00</span></div>
+          <input type="range" data-p="beta" min="0.5" max="5" step="0.1" value="3"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">La relaci&oacute;n clave</div>
+        <div class="panel-note">Donde el costo medio toca su m&iacute;nimo, el costo marginal lo cruza:
+          mientras producir una unidad m&aacute;s cueste menos que el promedio, el promedio baja.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">En el nivel elegido</div>
+      <div class="metric"><div class="ml">Costo total C(q)</div><div class="mv" id="m-c">&mdash;</div></div>
+      <div class="metric"><div class="ml">Costo medio CMe</div><div class="mv" id="m-cme">&mdash;</div></div>
+      <div class="metric"><div class="ml">Costo marginal CM</div><div class="mv" id="m-cm">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">El m&iacute;nimo del costo medio</div>
+      <div class="metric"><div class="ml">q que minimiza el CMe</div><div class="mv" id="m-qmin">&mdash;</div></div>
+      <div class="metric"><div class="ml">CMe m&iacute;nimo</div><div class="mv" id="m-cmemin">&mdash;</div></div>
+      <div class="metric"><div class="ml">&iquest;El CMe sube o baja?</div><div class="mv" id="m-dir">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindTabs, bindPresets, initTools } = ICS;
+
+const defaults = { q: 1.5, F: 1, c: 1, beta: 3, tab: "cuad" };
+const state    = Object.assign({}, defaults);
+
+const presets = { ejercicio: { tab: "cuad", F: 1, c: 1, q: 1 } };
+
+const format = { q: v => v.toFixed(2), F: v => v.toFixed(2), c: v => v.toFixed(2), beta: v => v.toFixed(2) };
+
+const pTot = new Plot("c-total", { height: 350 });
+const pUni = new Plot("c-unit",  { height: 350 });
+
+const Q_MAX = 6;
+
+// las tres familias de costo, con su total y su marginal analítico
+function modelo(s) {
+  if (s.tab === "cuad")
+    return { C: q => s.F + s.c * q * q, CM: q => 2 * s.c * q,
+             txt: "C(q) = " + fmt.n(s.F,2) + " + " + fmt.n(s.c,2) + "·q²",
+             cme: "CMe = " + fmt.n(s.F,2) + "/q + " + fmt.n(s.c,2) + "·q",
+             cm:  "CM = 2·" + fmt.n(s.c,2) + "·q",
+             qmin: s.c > 0 ? Math.sqrt(s.F / s.c) : NaN };
+  if (s.tab === "lineal")
+    return { C: q => s.F + s.c * q, CM: () => s.c,
+             txt: "C(q) = " + fmt.n(s.F,2) + " + " + fmt.n(s.c,2) + "·q",
+             cme: "CMe = " + fmt.n(s.F,2) + "/q + " + fmt.n(s.c,2),
+             cm:  "CM = " + fmt.n(s.c,2) + "   (constante)",
+             qmin: s.F > 0 ? Infinity : 0 };
+  // cúbica: costo variable con tramo decreciente y luego creciente
+  const g = s.c;                       // coeficiente del término cúbico
+  return { C: q => s.F + s.beta * q - (s.beta * 0.6) * q * q + g * q * q * q,
+           CM: q => s.beta - 2 * (s.beta * 0.6) * q + 3 * g * q * q,
+           txt: "C(q) = " + fmt.n(s.F,2) + " + " + fmt.n(s.beta,2) + "·q − " +
+                fmt.n(s.beta*0.6,2) + "·q² + " + fmt.n(g,2) + "·q³",
+           cme: "CMe = C(q)/q",
+           cm:  "CM = ∂C/∂q",
+           qmin: null };
+}
+
+// mínimo del costo medio, por búsqueda numérica cuando no hay fórmula
+function minimoCMe(m) {
+  let mejorQ = NaN, mejor = Infinity;
+  for (let i = 1; i <= 2000; i++) {
+    const q = Q_MAX * i / 2000, v = m.C(q) / q;
+    if (isFinite(v) && v < mejor) { mejor = v; mejorQ = q; }
+  }
+  return { q: mejorQ, cme: mejor };
+}
+
+function render() {
+  const s = state;
+  const m = modelo(s);
+  document.getElementById("sr-beta").style.display = s.tab === "cubica" ? "" : "none";
+  document.getElementById("sn-c").textContent = s.tab === "cubica" ? "Coeficiente cúbico (γ)" : "Coeficiente c";
+
+  const q = s.q;
+  const Cq = m.C(q), CMe = Cq / q, CM = m.CM(q);
+  const mn = minimoCMe(m);
+
+  /* ---------- panel izquierdo: el costo total ---------- */
+  const tot = [];
+  for (let i = 1; i <= 240; i++) { const x = Q_MAX * i / 240; tot.push([x, m.C(x)]); }
+  const maxC = Math.max(...tot.map(t => t[1])) * 1.1;
+  pTot.begin(Q_MAX, maxC).grid()
+      .axes("Producción (q)", "Costo total", { skipQ: [q], skipP: [Cq] });
+  pTot.push();
+  pTot.poly(tot, C.supply, { width: 2.6 });
+  // el rayo desde el origen: su pendiente es el costo medio
+  pTot.seg(0, 0, Q_MAX, CMe * Q_MAX, C.muted, { width: 1.4, dash: [5, 3] });
+  // la tangente: su pendiente es el costo marginal
+  const d = Q_MAX * 0.14;
+  pTot.seg(q - d, Cq - CM * d, q + d, Cq + CM * d, C.demand, { width: 1.8 });
+  pTot.pop();
+  pTot.seg(q, 0, q, Cq, C.muted, { dash: [3, 3], width: 0.9 });
+  pTot.dot(q, Cq, C.txt);
+  pTot.tickQ(q, "q", C.txt);
+  pTot.label(q, Cq, "C = " + fmt.n(Cq), C.txt, { dx: 8, dy: -8, box: true });
+  if (s.F > 0) pTot.tickP(s.F, "F", C.muted);
+
+  /* ---------- panel derecho: medio y marginal ---------- */
+  const cme = [], cm = [];
+  for (let i = 1; i <= 240; i++) {
+    const x = Q_MAX * i / 240;
+    const v = m.C(x) / x;
+    if (isFinite(v)) cme.push([x, v]);
+    cm.push([x, m.CM(x)]);
+  }
+  const maxU = Math.min(
+    Math.max(...cme.map(c => c[1]).slice(20), ...cm.map(c => c[1])) * 1.25,
+    (mn.cme || 1) * 6);
+  pUni.begin(Q_MAX, Math.max(maxU, 0.5)).grid()
+      .axes("Producción (q)", "Costo por unidad", { skipQ: [q, mn.q], skipP: [CMe, CM] });
+  pUni.push();
+  pUni.poly(cme, C.csLine, { width: 2.6 });
+  pUni.poly(cm,  C.demand, { width: 2.6 });
+  pUni.pop();
+
+  if (isFinite(mn.q) && mn.q < Q_MAX * 0.995) {
+    pUni.seg(mn.q, 0, mn.q, mn.cme, C.muted, { dash: [4, 3], width: 1 });
+    pUni.dot(mn.q, mn.cme, C.txt);
+    pUni.tickQ(mn.q, "q*", C.txt);
+    pUni.label(mn.q, mn.cme, "CM = CMe", C.txt, { dx: 7, dy: -8, bold: true, box: true });
+  }
+  pUni.seg(q, 0, q, Math.max(CMe, CM), C.muted, { dash: [3, 3], width: 0.9 });
+  pUni.dot(q, CMe, C.csLine);
+  pUni.dot(q, CM,  C.demand);
+  pUni.tickQ(q, "q", C.policy);
+  pUni.label(Q_MAX * 0.96, Math.max(maxU, 0.5) * 0.88, "CMe", C.csLine, { align: "right", box: true });
+  pUni.label(Q_MAX * 0.96, Math.max(maxU, 0.5) * 0.76, "CM",  C.demand, { align: "right", box: true });
+
+  /* ---------- números ---------- */
+  document.getElementById("m-c").textContent   = fmt.n(Cq);
+  document.getElementById("m-cme").textContent = fmt.n(CMe);
+  document.getElementById("m-cm").textContent  = fmt.n(CM);
+  document.getElementById("m-qmin").textContent =
+    !isFinite(mn.q) ? "—" : mn.q >= Q_MAX * 0.995 ? "más allá del rango" : fmt.n(mn.q);
+  document.getElementById("m-cmemin").textContent = isFinite(mn.cme) ? fmt.n(mn.cme) : "—";
+  document.getElementById("m-dir").textContent =
+    CM < CMe - 1e-6 ? "baja (CM < CMe)" : CM > CMe + 1e-6 ? "sube (CM > CMe)" : "está en su mínimo";
+
+  document.getElementById("algebra").innerHTML =
+    '<div class="step">' + m.txt + '</div>' +
+    '<div class="step">' + m.cme + '      ' + m.cm + '</div>' +
+    '<div class="step">∂CMe/∂q = ∂/∂q [C/q] = (CM·q − C)/q² = (CM − CMe)/q</div>' +
+    '<div class="step">Igualando a cero:  <span class="res">CM = CMe</span>' +
+      (isFinite(mn.q) && mn.q < Q_MAX * 0.995
+        ? '   ⇒  q* = ' + fmt.n(mn.q) + ',  CMe mínimo = ' + fmt.n(mn.cme)
+        : '') + '</div>';
+
+  const nota = document.getElementById("note");
+  if (s.tab === "lineal") {
+    nota.textContent = "Con costo marginal constante el CM es una horizontal y el CMe baja siempre, acercándose a él: " +
+      "el costo fijo se reparte entre más unidades. Nunca se cruzan, así que no hay un nivel de producción que minimice el CMe " +
+      "dentro del rango. Es el caso de retornos constantes a escala con un costo fijo.";
+  } else if (CM < CMe - 1e-6) {
+    nota.textContent = "Aquí CM = " + fmt.n(CM) + " está por debajo del CMe = " + fmt.n(CMe) + ": la unidad siguiente cuesta " +
+      "menos que el promedio actual, así que al producirla el promedio baja. Mientras eso pase, el CMe sigue cayendo. " +
+      "Fíjate en el panel izquierdo: la tangente es más plana que el rayo.";
+  } else if (CM > CMe + 1e-6) {
+    nota.textContent = "Aquí CM = " + fmt.n(CM) + " supera al CMe = " + fmt.n(CMe) + ": la unidad siguiente cuesta más que el " +
+      "promedio, así que lo empuja hacia arriba. En el panel izquierdo la tangente es más inclinada que el rayo.";
+  } else {
+    nota.textContent = "Estás en el mínimo del costo medio, y es justo donde CM = CMe. No es coincidencia: derivando CMe = C/q " +
+      "se llega a ∂CMe/∂q = (CM − CMe)/q, que se anula exactamente cuando ambos coinciden.";
+  }
+}
+
+bindSliders(state, render, format);
+bindTabs(state, "tab", render);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-total", file: "m36-costo-medio-marginal" });
+</script>
+</body>
+</html>

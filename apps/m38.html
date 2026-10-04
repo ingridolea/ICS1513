@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Costos en el corto plazo — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Costos en el corto plazo</h1>
+  <span>M38 &middot; Costos de los productores</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="produccion">Derivado de la funci&oacute;n de producci&oacute;n</button>
+    <button class="tab" data-tab="formaU">Costo variable en forma de U</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" data-preset="ejercicio">Ejercicio: q = k<sup>&frac12;</sup>l<sup>&frac12;</sup>, k&#8321; = 1</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Costo total, fijo y variable</div>
+      <canvas id="c-total"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Costos medios y costo marginal</div>
+      <canvas id="c-unit"></canvas>
+    </div>
+  </div>
+
+  <div class="panel-note" id="note" style="padding:0 4px"></div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Costo total C<sub>CP</sub></span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-fiscal-line)" stroke-width="2.5"/></svg>Costo variable CV</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-muted)" stroke-width="2" stroke-dasharray="5 3"/></svg>Costo fijo CF</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-cs-line)" stroke-width="2.5"/></svg>CMe</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-indif)" stroke-width="2.5"/></svg>CVMe</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-policy)" stroke-width="2.5"/></svg>CFMe</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>CM</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Nivel de producci&oacute;n</div>
+        <div class="sr"><div class="sh"><span class="sn">q</span><span class="sv" id="v-q">1.50</span></div>
+          <input type="range" data-p="q" min="0.1" max="6" step="0.05" value="1.5"></div>
+      </div>
+      <div class="slider-group" id="g-prod">
+        <div class="group-label">Capital fijo y precios</div>
+        <div class="sr"><div class="sh"><span class="sn">Capital fijo (k&#8321;)</span><span class="sv" id="v-k1">1.00</span></div>
+          <input type="range" data-p="k1" min="0.25" max="6" step="0.25" value="1"></div>
+        <div class="sr"><div class="sh"><span class="sn">Precio del capital (r)</span><span class="sv" id="v-r">1.00</span></div>
+          <input type="range" data-p="r" min="0.25" max="4" step="0.25" value="1"></div>
+        <div class="sr"><div class="sh"><span class="sn">Salario (w)</span><span class="sv" id="v-w">1.00</span></div>
+          <input type="range" data-p="w" min="0.25" max="4" step="0.25" value="1"></div>
+      </div>
+      <div class="slider-group" id="g-u">
+        <div class="group-label">Costo variable c&uacute;bico</div>
+        <div class="sr"><div class="sh"><span class="sn">Costo fijo (F)</span><span class="sv" id="v-F">1.00</span></div>
+          <input type="range" data-p="F" min="0" max="6" step="0.25" value="1"></div>
+        <div class="sr"><div class="sh"><span class="sn">T&eacute;rmino lineal (&alpha;)</span><span class="sv" id="v-al">4.00</span></div>
+          <input type="range" data-p="al" min="1" max="8" step="0.25" value="4"></div>
+        <div class="sr"><div class="sh"><span class="sn">T&eacute;rmino cuadr&aacute;tico (&beta;)</span><span class="sv" id="v-be">2.00</span></div>
+          <input type="range" data-p="be" min="0" max="4" step="0.1" value="2"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Totales</div>
+      <div class="metric"><div class="ml">Costo fijo CF</div><div class="mv" id="m-cf">&mdash;</div></div>
+      <div class="metric"><div class="ml">Costo variable CV</div><div class="mv" id="m-cv">&mdash;</div></div>
+      <div class="metric"><div class="ml">Costo total C<sub>CP</sub></div><div class="mv" id="m-c">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Por unidad</div>
+      <div class="metric"><div class="ml">CMe = CFMe + CVMe</div><div class="mv" id="m-cme">&mdash;</div></div>
+      <div class="metric"><div class="ml">CVMe</div><div class="mv" id="m-cvme">&mdash;</div></div>
+      <div class="metric"><div class="ml">CM</div><div class="mv" id="m-cm">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindTabs, bindPresets, initTools } = ICS;
+
+const defaults = { q: 1.5, k1: 1, r: 1, w: 1, F: 1, al: 4, be: 2, tab: "produccion" };
+const state    = Object.assign({}, defaults);
+
+const presets = { ejercicio: { tab: "produccion", k1: 1, r: 1, w: 1, q: 1 } };
+
+const format = { q: v => v.toFixed(2), k1: v => v.toFixed(2), r: v => v.toFixed(2),
+                 w: v => v.toFixed(2), F: v => v.toFixed(2), al: v => v.toFixed(2), be: v => v.toFixed(2) };
+
+const pTot = new Plot("c-total", { height: 350 });
+const pUni = new Plot("c-unit",  { height: 350 });
+
+const Q_MAX = 6;
+
+/* El modelo del corto plazo: siempre CF + CV(q), con su marginal analítico.
+   En la pestaña de producción, CV sale de q = k₁^(1/2)·l^(1/2) ⇒ l = q²/k₁. */
+function modelo(s) {
+  if (s.tab === "produccion") {
+    const CF = s.r * s.k1;
+    return {
+      CF, CV: q => s.w * q * q / s.k1,
+      CM: q => 2 * s.w * q / s.k1,
+      txt: "q = k₁^½ · l^½  ⇒  l_CP(q) = q²/k₁",
+      lineas: [
+        "CF_CP = r·k₁ = " + fmt.n(s.r, 2) + "·" + fmt.n(s.k1, 2) + " = " + fmt.n(CF, 2),
+        "CV_CP(q) = w·(q²/k₁) = " + fmt.n(s.w, 2) + "·q²/" + fmt.n(s.k1, 2),
+        "CM_CP = ∂C/∂q = 2w·(q/k₁) = " + fmt.n(2 * s.w / s.k1, 2) + "·q"
+      ]
+    };
+  }
+  const g = 1;   // coeficiente cúbico, fijo para que la U sea legible
+  return {
+    CF: s.F,
+    CV: q => s.al * q - s.be * q * q + g * q * q * q,
+    CM: q => s.al - 2 * s.be * q + 3 * g * q * q,
+    txt: "CV(q) = α·q − β·q² + q³",
+    lineas: [
+      "CV(q) = " + fmt.n(s.al, 2) + "·q − " + fmt.n(s.be, 2) + "·q² + q³",
+      "CVMe(q) = " + fmt.n(s.al, 2) + " − " + fmt.n(s.be, 2) + "·q + q²",
+      "CM(q) = " + fmt.n(s.al, 2) + " − " + fmt.n(2 * s.be, 2) + "·q + 3q²"
+    ]
+  };
+}
+
+function minimo(fn) {
+  let mq = NaN, mv = Infinity;
+  for (let i = 1; i <= 2000; i++) {
+    const q = Q_MAX * i / 2000, v = fn(q);
+    if (isFinite(v) && v < mv) { mv = v; mq = q; }
+  }
+  return { q: mq, v: mv };
+}
+
+function render() {
+  const s = state;
+  document.getElementById("g-prod").style.display = s.tab === "produccion" ? "" : "none";
+  document.getElementById("g-u").style.display    = s.tab === "formaU" ? "" : "none";
+
+  const m = modelo(s);
+  const q = s.q;
+  const CF = m.CF, CV = m.CV(q), Ctot = CF + CV;
+  const CFMe = CF / q, CVMe = CV / q, CMe = Ctot / q, CM = m.CM(q);
+
+  const minCMe  = minimo(x => (m.CF + m.CV(x)) / x);
+  const minCVMe = minimo(x => m.CV(x) / x);
+
+  /* ---------- panel izquierdo: los totales ---------- */
+  const tC = [], tV = [];
+  for (let i = 1; i <= 240; i++) {
+    const x = Q_MAX * i / 240;
+    tV.push([x, m.CV(x)]);
+    tC.push([x, CF + m.CV(x)]);
+  }
+  const maxT = Math.max(...tC.map(t => t[1])) * 1.1;
+  pTot.begin(Q_MAX, maxT).grid()
+      .axes("Producción (q)", "Costo", { skipQ: [q], skipP: [Ctot, CF] });
+  pTot.push();
+  pTot.seg(0, CF, Q_MAX, CF, C.muted, { width: 1.6, dash: [5, 3] });
+  pTot.poly(tV, C.fiscalLine, { width: 2.4 });
+  pTot.poly(tC, C.supply,     { width: 2.6 });
+  pTot.pop();
+  pTot.seg(q, 0, q, Ctot, C.muted, { dash: [3, 3], width: 0.9 });
+  pTot.dot(q, Ctot, C.txt);
+  pTot.dot(q, CV, C.fiscalLine);
+  pTot.tickQ(q, "q", C.txt);
+  if (CF > 0) pTot.tickP(CF, "CF", C.muted);
+  if (CV > 0.02) pTot.spanV(CV, Ctot, q, "CF", C.muted);
+  pTot.label(Q_MAX * 0.96, maxT * 0.92, "C_CP", C.supply, { align: "right", box: true });
+  pTot.label(Q_MAX * 0.96, maxT * 0.80, "CV",   C.fiscalLine, { align: "right", box: true });
+
+  /* ---------- panel derecho: medios y marginal ---------- */
+  const sCMe = [], sCVMe = [], sCFMe = [], sCM = [];
+  for (let i = 1; i <= 300; i++) {
+    const x = Q_MAX * i / 300;
+    sCMe.push([x, (CF + m.CV(x)) / x]);
+    sCVMe.push([x, m.CV(x) / x]);
+    sCFMe.push([x, CF / x]);
+    sCM.push([x, m.CM(x)]);
+  }
+  const maxU = Math.min(
+    Math.max(...sCMe.map(x => x[1]).slice(30), ...sCM.map(x => x[1])) * 1.2,
+    (minCMe.v || 1) * 5);
+  pUni.begin(Q_MAX, Math.max(maxU, 0.5)).grid()
+      .axes("Producción (q)", "Costo por unidad", { skipQ: [q], skipP: [CMe, CM] });
+  pUni.push();
+  if (CF > 0) pUni.poly(sCFMe, C.policy, { width: 1.8 });
+  pUni.poly(sCVMe, C.indif,   { width: 2.2 });
+  pUni.poly(sCMe,  C.csLine,  { width: 2.6 });
+  pUni.poly(sCM,   C.demand,  { width: 2.6 });
+  pUni.pop();
+
+  // el costo marginal corta al medio y al variable medio en sus mínimos
+  [[minCMe, C.csLine, "CM = CMe"], [minCVMe, C.indif, "CM = CVMe"]].forEach(([mn, col, etq]) => {
+    if (isFinite(mn.q) && mn.q > Q_MAX * 0.02 && mn.q < Q_MAX * 0.98) {
+      pUni.dot(mn.q, mn.v, col);
+      pUni.seg(mn.q, 0, mn.q, mn.v, C.muted, { dash: [4, 3], width: 0.9 });
+      pUni.label(mn.q, mn.v, etq, col, { dx: 6, dy: -8, box: true });
+    }
+  });
+  pUni.seg(q, 0, q, Math.max(CMe, CM), C.muted, { dash: [3, 3], width: 0.9 });
+  pUni.dot(q, CMe, C.csLine);
+  pUni.dot(q, CM,  C.demand);
+  pUni.tickQ(q, "q", C.policy);
+
+  /* ---------- números ---------- */
+  document.getElementById("m-cf").textContent   = fmt.n(CF);
+  document.getElementById("m-cv").textContent   = fmt.n(CV);
+  document.getElementById("m-c").textContent    = fmt.n(Ctot);
+  document.getElementById("m-cme").textContent  = fmt.n(CMe) + "  (" + fmt.n(CFMe) + " + " + fmt.n(CVMe) + ")";
+  document.getElementById("m-cvme").textContent = fmt.n(CVMe);
+  document.getElementById("m-cm").textContent   = fmt.n(CM);
+
+  document.getElementById("algebra").innerHTML =
+    '<div class="step">' + m.txt + '</div>' +
+    m.lineas.map(l => '<div class="step">' + l + '</div>').join("") +
+    '<div class="step">C_CP(q) = CF + CV(q) = <span class="res">' + fmt.n(Ctot) + '</span>' +
+      '   CMe = ' + fmt.n(CMe) + '   CM = ' + fmt.n(CM) + '</div>' +
+    (isFinite(minCMe.q) && minCMe.q < Q_MAX * 0.98
+      ? '<div class="step">Mínimo del CMe en q = <span class="res">' + fmt.n(minCMe.q) +
+        '</span>, donde CMe = CM = ' + fmt.n(minCMe.v) + '</div>' : "");
+
+  const nota = document.getElementById("note");
+  if (s.tab === "produccion") {
+    nota.textContent = "En el corto plazo el capital está clavado en k₁ = " + fmt.n(s.k1, 2) + ", así que el único modo de " +
+      "producir más es contratar trabajo: l = q²/k₁. El costo fijo r·k₁ = " + fmt.n(CF, 2) + " se paga igual se produzca lo que " +
+      "se produzca, y por eso el CFMe cae siempre. Con k₁ = 1, r = 1 y w = 1 el costo queda en C = q² + 1, que es justo el " +
+      "ejercicio de la clase: el CMe toca su mínimo en q = 1 con valor 2, donde lo cruza el CM.";
+  } else {
+    nota.textContent = "Con un costo variable cúbico aparecen las formas clásicas: el CFMe cae como una hipérbola, el CVMe " +
+      "tiene forma de U y el CMe también, pero desplazado a la derecha. El costo marginal corta a ambos en sus mínimos " +
+      "respectivos — primero al CVMe y después al CMe, porque el CMe incluye el costo fijo que sigue repartiéndose.";
+  }
+}
+
+bindSliders(state, render, format);
+bindTabs(state, "tab", render);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-total", file: "m38-costos-corto-plazo" });
+</script>
+</body>
+</html>

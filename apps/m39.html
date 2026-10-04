@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Corto plazo y largo plazo: la curva envolvente — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Corto plazo y largo plazo: la curva envolvente</h1>
+  <span>M39 &middot; Costos de los productores</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="totales">Costos totales</button>
+    <button class="tab" data-tab="medios">Costos medios y marginales</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" data-preset="ajustado">k&#8321; &oacute;ptimo para la q actual</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Elecci&oacute;n de factores: corto plazo frente a largo plazo</div>
+      <canvas id="c-iso"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Costos</div>
+      <canvas id="c-cost"></canvas>
+    </div>
+  </div>
+
+  <div class="panel-note" id="note" style="padding:0 4px"></div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-indif)" stroke-width="2.5"/></svg>Isocuantas</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-policy)" stroke-width="2.5"/></svg>Corto plazo: capital clavado en k&#8321;</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Largo plazo: el capital se ajusta</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-muted)" stroke-width="2" stroke-dasharray="5 3"/></svg>Otros niveles de capital fijo</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Producci&oacute;n y capital</div>
+        <div class="sr"><div class="sh"><span class="sn">Nivel de producci&oacute;n (q)</span><span class="sv" id="v-q">10.0</span></div>
+          <input type="range" data-p="q" min="2" max="26" step="0.5" value="10"></div>
+        <div class="sr"><div class="sh"><span class="sn">Capital fijo del corto plazo (k&#8321;)</span><span class="sv" id="v-k1">10.0</span></div>
+          <input type="range" data-p="k1" min="2" max="30" step="0.5" value="10"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Precios de los factores</div>
+        <div class="sr"><div class="sh"><span class="sn">Precio del capital (r)</span><span class="sv" id="v-r">2.00</span></div>
+          <input type="range" data-p="r" min="0.5" max="5" step="0.1" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Salario (w)</span><span class="sv" id="v-w">2.00</span></div>
+          <input type="range" data-p="w" min="0.5" max="5" step="0.1" value="2"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Tecnolog&iacute;a &nbsp;f = k^a&middot;l^b</div>
+        <div class="sr"><div class="sh"><span class="sn">Elasticidad del capital (a)</span><span class="sv" id="v-a">0.50</span></div>
+          <input type="range" data-p="a" min="0.2" max="0.8" step="0.05" value="0.5"></div>
+        <div class="sr"><div class="sh"><span class="sn">Elasticidad del trabajo (b)</span><span class="sv" id="v-b">0.50</span></div>
+          <input type="range" data-p="b" min="0.2" max="0.8" step="0.05" value="0.5"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">A la producci&oacute;n elegida</div>
+      <div class="metric"><div class="ml">Costo de corto plazo</div><div class="mv" id="m-ccp">&mdash;</div></div>
+      <div class="metric"><div class="ml">Costo de largo plazo</div><div class="mv" id="m-clp">&mdash;</div></div>
+      <div class="metric"><div class="ml">Sobrecosto por tener k fijo</div><div class="mv" id="m-brecha">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Capital</div>
+      <div class="metric"><div class="ml">k&#8321; fijo del corto plazo</div><div class="mv" id="m-k1">&mdash;</div></div>
+      <div class="metric"><div class="ml">k* &oacute;ptimo de largo plazo</div><div class="mv" id="m-kopt">&mdash;</div></div>
+      <div class="metric"><div class="ml">q en que k&#8321; es el &oacute;ptimo</div><div class="mv" id="m-qtan">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script src="produccion.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindTabs, bindPresets, initTools } = ICS;
+const { FP, dibujarIsocuanta, isocosto } = Produccion;
+
+const defaults = { q: 10, k1: 10, r: 2, w: 2, a: 0.5, b: 0.5, tab: "totales" };
+const state    = Object.assign({}, defaults);
+
+const format = { q: v => v.toFixed(1), k1: v => v.toFixed(1), r: v => v.toFixed(2),
+                 w: v => v.toFixed(2), a: v => v.toFixed(2), b: v => v.toFixed(2) };
+
+const pIso = new Plot("c-iso",  { height: 360 });
+const pCos = new Plot("c-cost", { height: 360 });
+
+const Q_MAX = 28;
+
+function render() {
+  const s = state;
+  const p = { A: 1, a: s.a, b: s.b };
+
+  const lCorto = (q, k) => Math.pow(q / Math.pow(k, s.a), 1 / s.b);
+  const cCorto = (q, k) => s.r * k + s.w * lCorto(q, k);
+  const largo  = q => FP.cobb.minimiza(s.r, s.w, q, p);
+
+  const opt = largo(s.q);
+  const lCP = lCorto(s.q, s.k1);
+  const CCP = cCorto(s.q, s.k1), CLP = opt.C;
+  // la producción para la que el capital fijo actual es justamente el óptimo
+  // k* = q^(1/(a+b)) · razon^(−b/(a+b))  con razon = (b·r)/(a·w)
+  // ⇒ despejando q cuando k* = k₁:  q = k₁^(a+b) · razon^b
+  const razon = (s.b * s.r) / (s.a * s.w);
+  const qTangente = Math.pow(s.k1, s.a + s.b) * Math.pow(razon, s.b);
+
+  /* ---------- panel izquierdo: isocuantas y elección de factores ---------- */
+  const maxK = 34, maxL = Math.max(lCP * 1.4, opt.l * 1.8, 20);
+  pIso.begin(maxK, Math.min(maxL, 90)).grid()
+      .axes("Capital (k)", "Trabajo (l)", { skipQ: [s.k1, opt.k], skipP: [lCP, opt.l] });
+
+  pIso.push();
+  [0.6, 1, 1.45].forEach((kq, i) => {
+    const q = s.q * kq;
+    dibujarIsocuanta(pIso, "cobb", q, p, i === 1 ? C.indif : "rgba(138,92,199,0.32)",
+      { width: i === 1 ? 2.4 : 1.4 });
+    const o = largo(q);
+    // el isocosto de largo plazo es tangente; el de corto plazo pasa por el punto con k fijo
+    isocosto(pIso, s.r, s.w, o.C, i === 1 ? C.demand : "rgba(27,63,139,0.3)", { width: i === 1 ? 2.2 : 1.2 });
+    if (i !== 1) isocosto(pIso, s.r, s.w, cCorto(q, s.k1), "rgba(66,66,67,0.22)", { width: 1.1, dash: [4, 3] });
+  });
+  isocosto(pIso, s.r, s.w, CCP, C.policy, { width: 2.2 });
+  // la recta horizontal del capital fijo
+  pIso.seg(s.k1, 0, s.k1, pIso.maxP, C.policy, { width: 1.3, dash: [5, 3] });
+  pIso.pop();
+
+  pIso.dot(s.k1, lCP, C.policy);
+  pIso.label(s.k1, lCP, "corto plazo", C.policy, { dx: 7, dy: -8, box: true });
+  pIso.dot(opt.k, opt.l, C.demand);
+  pIso.label(opt.k, opt.l, "largo plazo", C.demand, { dx: 7, dy: 15, box: true });
+  pIso.tickQ(s.k1, "k₁", C.policy);
+  pIso.tickQ(opt.k, "k*", C.demand);
+
+  /* ---------- panel derecho: costos ---------- */
+  const medios = s.tab === "medios";
+  document.getElementById("ptitle").textContent = medios
+    ? "Costo medio y marginal: la envolvente"
+    : "Costo total: la de largo plazo envuelve a las de corto plazo";
+
+  const serieLP = [], serieCP = [], otras = [[s.k1 * 0.55, []], [s.k1 * 1.6, []]];
+  for (let i = 1; i <= 260; i++) {
+    const q = Q_MAX * i / 260;
+    const cl = largo(q).C, cc = cCorto(q, s.k1);
+    serieLP.push([q, medios ? cl / q : cl]);
+    serieCP.push([q, medios ? cc / q : cc]);
+    otras.forEach(o => { const v = cCorto(q, o[0]); o[1].push([q, medios ? v / q : v]); });
+  }
+  const refs = serieCP.concat(serieLP).map(x => x[1]).filter(isFinite);
+  const maxY = medios
+    ? Math.min(Math.max(...refs.slice(20)) * 1.15, (CLP / s.q) * 4)
+    : Math.max(...refs) * 1.1;
+
+  pCos.begin(Q_MAX, Math.max(maxY, 0.5)).grid()
+      .axes("Producción (q)", medios ? "Costo por unidad" : "Costo total",
+            { skipQ: [s.q, qTangente] });
+  pCos.push();
+  otras.forEach(o => pCos.poly(o[1], "rgba(66,66,67,0.26)", { width: 1.3, dash: [5, 3] }));
+  pCos.poly(serieCP, C.policy, { width: 2.4 });
+  pCos.poly(serieLP, C.demand, { width: 2.6 });
+  pCos.pop();
+
+  const yCP = medios ? CCP / s.q : CCP, yLP = medios ? CLP / s.q : CLP;
+  pCos.seg(s.q, 0, s.q, Math.max(yCP, yLP), C.muted, { dash: [3, 3], width: 0.9 });
+  pCos.dot(s.q, yCP, C.policy);
+  pCos.dot(s.q, yLP, C.demand);
+  pCos.tickQ(s.q, "q", C.txt);
+  if (Math.abs(yCP - yLP) > maxY * 0.015)
+    pCos.spanV(yLP, yCP, s.q, "+" + fmt.n(yCP - yLP), C.dwlLine);
+  if (qTangente > 0.4 && qTangente < Q_MAX * 0.97) {
+    pCos.seg(qTangente, 0, qTangente, maxY * 0.9, C.muted, { dash: [4, 3], width: 0.9 });
+    pCos.tickQ(qTangente, "q₁", C.totalLine);
+    const yT = medios ? largo(qTangente).C / qTangente : largo(qTangente).C;
+    pCos.dot(qTangente, yT, C.txt);
+  }
+  pCos.label(Q_MAX * 0.96, Math.max(maxY, 0.5) * 0.9,  "C_CP(k₁)", C.policy, { align: "right", box: true });
+  pCos.label(Q_MAX * 0.96, Math.max(maxY, 0.5) * 0.78, "C_LP",     C.demand, { align: "right", box: true });
+
+  /* ---------- números ---------- */
+  document.getElementById("m-ccp").textContent    = fmt.n(CCP);
+  document.getElementById("m-clp").textContent    = fmt.n(CLP);
+  document.getElementById("m-brecha").textContent = "+" + fmt.n(CCP - CLP);
+  document.getElementById("m-k1").textContent     = fmt.n(s.k1);
+  document.getElementById("m-kopt").textContent   = fmt.n(opt.k);
+  document.getElementById("m-qtan").textContent   = isFinite(qTangente) ? fmt.n(qTangente) : "—";
+
+  document.getElementById("algebra").innerHTML =
+    '<div class="step">Corto plazo:  l_CP(q) = (q / k₁^a)^(1/b)  ⇒  C_CP(q) = r·k₁ + w·l_CP(q)</div>' +
+    '<div class="step">Largo plazo:  se elige también k, resolviendo TST = r/w  ⇒  C_LP(q) = mín_k C_CP(q, k)</div>' +
+    '<div class="step">Condición de la envolvente:  ∂C_CP(r,w,q,k₁)/∂k₁ = 0  ⇒  se cumple en q₁ = ' +
+      (isFinite(qTangente) ? fmt.n(qTangente) : "—") + '</div>' +
+    '<div class="step">En q = ' + fmt.n(s.q, 1) + ':  C_CP = ' + fmt.n(CCP) + '  y  C_LP = ' + fmt.n(CLP) +
+      '  ⇒  sobrecosto = <span class="res">' + fmt.n(CCP - CLP) + '</span></div>';
+
+  const nota = document.getElementById("note");
+  if (Math.abs(CCP - CLP) < CLP * 0.002) {
+    nota.textContent = "Aquí el capital fijo k₁ = " + fmt.n(s.k1, 1) + " es justo el que la empresa habría elegido en el largo " +
+      "plazo para producir q = " + fmt.n(s.q, 1) + ". Las dos curvas se tocan: en ese punto el corto plazo no cuesta nada de más, " +
+      "y es el único nivel de producción en que la curva de corto plazo toca a la envolvente.";
+  } else if (s.k1 < opt.k) {
+    nota.textContent = "El capital fijo (" + fmt.n(s.k1, 1) + ") es menor que el que convendría en el largo plazo (" +
+      fmt.n(opt.k, 1) + "). Como no puede ajustarlo, la empresa compensa contratando más trabajo del que querría: " +
+      "la TST deja de igualar a r/w y el costo sube en " + fmt.n(CCP - CLP) + ". Esa es la ineficiencia del corto plazo.";
+  } else {
+    nota.textContent = "El capital fijo (" + fmt.n(s.k1, 1) + ") es mayor que el óptimo de largo plazo (" + fmt.n(opt.k, 1) +
+      "): la empresa está cargando con maquinaria que no necesita para este nivel de producción, y paga " +
+      fmt.n(CCP - CLP) + " de más. Mueve q hacia arriba y verás cómo ese sobrecosto desaparece justo en q₁.";
+  }
+}
+
+bindSliders(state, render, format);
+bindTabs(state, "tab", render);
+document.querySelector('[data-preset="ajustado"]').addEventListener("click", () => {
+  state.k1 = Math.round(FP.cobb.minimiza(state.r, state.w, state.q, { A: 1, a: state.a, b: state.b }).k * 2) / 2;
+  document.querySelector('input[data-p="k1"]').value = state.k1;
+  ICS.syncLabels(state, format);
+  render();
+});
+initTools({ state, defaults, format, render, canvas: "c-cost", file: "m39-envolvente" });
+</script>
+</body>
+</html>

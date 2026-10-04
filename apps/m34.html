@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Costos contables y costos económicos — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Costos contables y costos econ&oacute;micos</h1>
+  <span>M34 &middot; Costos de los productores</span>
+</header>
+
+<div class="app">
+
+  <div class="panel-note" style="padding:0 4px">
+    Dante compra una f&aacute;brica de galletas. Parte del dinero es suyo y parte puede venir de un pr&eacute;stamo.
+    Lo que pone de su bolsillo deja de ganar intereses en la cuenta de ahorro: ese inter&eacute;s no ganado es un
+    costo de oportunidad que la contabilidad no registra.
+  </div>
+
+  <div class="top-bar">
+    <button class="tool-btn" data-preset="ahorros">Todo con ahorros propios</button>
+    <button class="tool-btn" data-preset="prestamo">Con pr&eacute;stamo de $200.000</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title">Costo anual de financiar la f&aacute;brica</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-fiscal)"></span>Costo expl&iacute;cito: intereses pagados al banco</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-cs)"></span>Costo impl&iacute;cito: intereses que Dante deja de ganar</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">La compra</div>
+        <div class="sr"><div class="sh"><span class="sn">Valor de la f&aacute;brica</span><span class="sv" id="v-inv">$300.000</span></div>
+          <input type="range" data-p="inv" min="100" max="600" step="10" value="300"></div>
+        <div class="sr"><div class="sh"><span class="sn">Dinero propio que aporta</span><span class="sv" id="v-propio">$300.000</span></div>
+          <input type="range" data-p="propio" min="0" max="600" step="10" value="300"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Tasas</div>
+        <div class="sr"><div class="sh"><span class="sn">Inter&eacute;s de la cuenta de ahorro</span><span class="sv" id="v-tah">5,0%</span></div>
+          <input type="range" data-p="tah" min="0" max="15" step="0.5" value="5"></div>
+        <div class="sr"><div class="sh"><span class="sn">Inter&eacute;s del pr&eacute;stamo bancario</span><span class="sv" id="v-tpr">5,0%</span></div>
+          <input type="range" data-p="tpr" min="0" max="20" step="0.5" value="5"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">La idea</div>
+        <div class="panel-note">La contabilidad anota solo lo que sale de la caja. La econom&iacute;a suma adem&aacute;s
+          lo que se dej&oacute; de ganar en la mejor alternativa. Por eso el costo econ&oacute;mico no cambia al mover
+          el reparto entre ahorros y pr&eacute;stamo, pero el contable s&iacute;.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table class="wtable" id="tabla">
+      <thead><tr><th>Concepto</th><th>&iquest;Sale de la caja?</th><th>Costo contable</th><th>Costo econ&oacute;mico</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Financiamiento</div>
+      <div class="metric"><div class="ml">Aporte propio</div><div class="mv" id="m-propio">&mdash;</div></div>
+      <div class="metric"><div class="ml">Pr&eacute;stamo</div><div class="mv" id="m-prest">&mdash;</div></div>
+      <div class="metric"><div class="ml">Valor de la f&aacute;brica</div><div class="mv" id="m-inv">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Costo anual de capital</div>
+      <div class="metric"><div class="ml">Expl&iacute;cito (al banco)</div><div class="mv" id="m-exp">&mdash;</div></div>
+      <div class="metric"><div class="ml">Impl&iacute;cito (no ganado)</div><div class="mv" id="m-imp">&mdash;</div></div>
+      <div class="metric"><div class="ml">Brecha econ&oacute;mico &minus; contable</div><div class="mv" id="m-brecha">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindPresets, initTools } = ICS;
+
+// los montos se guardan en miles de pesos
+const defaults = { inv: 300, propio: 300, tah: 5, tpr: 5 };
+const state    = Object.assign({}, defaults);
+
+const presets = {
+  ahorros:  { inv: 300, propio: 300, tah: 5, tpr: 5 },
+  prestamo: { inv: 300, propio: 100, tah: 5, tpr: 5 }
+};
+
+const plata  = v => "$" + Math.round(v * 1000).toLocaleString("es-CL");
+const format = { inv: plata, propio: plata,
+                 tah: v => v.toFixed(1).replace(".", ",") + "%",
+                 tpr: v => v.toFixed(1).replace(".", ",") + "%" };
+
+const plot = new Plot("c-main", { height: 320, pad: { l: 150, r: 40, t: 28, b: 56 } });
+
+function render() {
+  const s = state;
+  const propio = Math.min(s.propio, s.inv);          // no puede aportar más que el valor
+  const prestamo = s.inv - propio;
+  const explicito = prestamo * s.tpr / 100;          // intereses que paga al banco
+  const implicito = propio * s.tah / 100;            // intereses que deja de ganar
+  const contable  = explicito;
+  const economico = explicito + implicito;
+
+  /* ---------- barras comparadas ---------- */
+  const maxV = Math.max(economico, contable, 1) * 1.3;
+  plot.begin(maxV, 2);
+  const ctx = plot.ctx;
+  ctx.strokeStyle = C.axis; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(plot.pad.l, plot.pad.t);
+  ctx.lineTo(plot.pad.l, plot.pad.t + plot.gH);
+  ctx.lineTo(plot.pad.l + plot.gW, plot.pad.t + plot.gH);
+  ctx.stroke();
+
+  const filas = [
+    ["Costo contable",  [[explicito, C.fiscal, "explícito"]]],
+    ["Costo económico", [[explicito, C.fiscal, "explícito"], [implicito, C.cs, "implícito"]]]
+  ];
+  const alto = plot.gH / 2;
+  filas.forEach(([nombre, partes], i) => {
+    const y0 = plot.pad.t + i * alto + alto * 0.26;
+    const h  = alto * 0.42;
+    let x = plot.pad.l;
+    partes.forEach(([val, color, etq]) => {
+      const w = (val / maxV) * plot.gW;
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y0, w, h);
+      ctx.strokeStyle = "rgba(66,66,67,0.35)"; ctx.lineWidth = 1;
+      ctx.strokeRect(x, y0, w, h);
+      if (w > 54) {
+        ctx.fillStyle = C.txt;
+        ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(plata(val), x + w / 2, y0 + h / 2 + 4);
+      }
+      x += w;
+    });
+    ctx.fillStyle = C.txt;
+    ctx.font = "600 12px 'Segoe UI', system-ui, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText(nombre, plot.pad.l - 10, y0 + h / 2 + 4);
+    ctx.font = "600 11px 'Segoe UI', system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillStyle = i ? C.csLine : C.fiscalLine;
+    ctx.fillText(plata(i ? economico : contable), x + 8, y0 + h / 2 + 4);
+  });
+  ctx.fillStyle = C.muted;
+  ctx.font = "11px 'Segoe UI', system-ui, sans-serif";
+  ctx.textAlign = "left";
+  ctx.fillText("Costo anual del capital, sin contar la inversión inicial de " + plata(s.inv),
+    plot.pad.l, plot.pad.t + plot.gH + 30);
+
+  /* ---------- tabla ---------- */
+  document.querySelector("#tabla tbody").innerHTML =
+    "<tr><td>Inversión en la fábrica</td><td>sí, una vez</td><td>" + plata(s.inv) + "</td><td>" + plata(s.inv) + "</td></tr>" +
+    "<tr><td>Intereses del préstamo (al año)</td><td>sí</td><td>" + plata(explicito) + "</td><td>" + plata(explicito) + "</td></tr>" +
+    "<tr><td>Intereses no ganados sobre los ahorros (al año)</td><td>no</td><td>—</td><td>" + plata(implicito) + "</td></tr>" +
+    "<tr><td>Costo de capital al año</td><td></td><td>" + plata(contable) + "</td><td>" + plata(economico) + "</td></tr>";
+
+  document.getElementById("m-propio").textContent = plata(propio);
+  document.getElementById("m-prest").textContent  = plata(prestamo);
+  document.getElementById("m-inv").textContent    = plata(s.inv);
+  document.getElementById("m-exp").textContent    = plata(explicito);
+  document.getElementById("m-imp").textContent    = plata(implicito);
+  document.getElementById("m-brecha").textContent = plata(implicito);
+
+  const nota = document.getElementById("note");
+  if (prestamo <= 0) {
+    nota.textContent = "Dante pone todo de su bolsillo: no paga intereses a nadie, así que la contabilidad no registra " +
+      "ningún costo de capital anual. Pero deja de ganar " + plata(implicito) + " al año en la cuenta de ahorro, " +
+      "y ese es un costo real de ser dueño de la fábrica. Mueve el aporte propio hacia abajo y verás cómo el costo contable " +
+      "aparece mientras el económico no se mueve.";
+  } else if (propio <= 0) {
+    nota.textContent = "Dante financia todo con el banco: ahora cada peso de costo sale de la caja, así que el costo contable " +
+      "y el económico coinciden. No hay costo implícito porque no sacrificó ahorros propios.";
+  } else if (Math.abs(s.tah - s.tpr) < 1e-9) {
+    nota.textContent = "Con las dos tasas iguales, el costo económico es el mismo (" + plata(economico) + ") sin importar " +
+      "cómo reparta el financiamiento: lo que cambia es solo cuánto de ese costo queda registrado en la contabilidad. " +
+      "Esa es exactamente la diferencia entre ambos enfoques.";
+  } else {
+    nota.textContent = "Con tasas distintas el reparto sí cambia el costo económico, porque la alternativa sacrificada " +
+      "(" + format.tah(s.tah) + " en la cuenta de ahorro) rinde distinto que el préstamo (" + format.tpr(s.tpr) + "). " +
+      "El costo contable sigue viendo solo los " + plata(explicito) + " que salen de la caja.";
+  }
+}
+
+bindSliders(state, render, format);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m34-costos-economicos" });
+</script>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Isocuantas y tasa marginal de sustitución técnica — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Isocuantas y tasa marginal de sustituci&oacute;n t&eacute;cnica</h1>
+  <span>M32 &middot; Costos de los productores</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="cobb">Cobb-Douglas</button>
+    <button class="tab" data-tab="fijas">Proporciones fijas</button>
+    <button class="tab" data-tab="lineal">Factores sustitutos</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" data-preset="varian">Ejemplo de clase: f = k&middot;l</button>
+    <button class="chip" data-layer="tangente"><span class="dot" style="background:var(--c-policy)"></span>Tangente (TST)</button>
+    <button class="chip" data-layer="mapa"><span class="dot" style="background:var(--c-indif)"></span>Mapa de isocuantas</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Mapa de isocuantas</div>
+      <canvas id="c-main"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">La TST a lo largo de la isocuanta</div>
+      <canvas id="c-tst"></canvas>
+    </div>
+  </div>
+
+  <div class="panel-note" id="note" style="padding:0 4px"></div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-indif)" stroke-width="2.5"/></svg>Isocuanta f(k,l) = q&#8320;</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-policy)" stroke-width="2.5"/></svg>Tangente: su pendiente es &minus;TST</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-total)"></span>Combinaciones que alcanzan al menos q&#8320;</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Punto sobre la isocuanta</div>
+        <div class="sr"><div class="sh"><span class="sn">Capital (k)</span><span class="sv" id="v-k">10.0</span></div>
+          <input type="range" data-p="k" min="1" max="38" step="0.5" value="10"></div>
+        <div class="sr"><div class="sh"><span class="sn">Nivel de producci&oacute;n q&#8320;</span><span class="sv" id="v-q">10.0</span></div>
+          <input type="range" data-p="q" min="2" max="30" step="0.5" value="10"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Tecnolog&iacute;a</div>
+        <div class="sr"><div class="sh"><span class="sn">Escala (A)</span><span class="sv" id="v-A">1.00</span></div>
+          <input type="range" data-p="A" min="0.5" max="3" step="0.1" value="1"></div>
+        <div class="sr"><div class="sh"><span class="sn" id="sn-a">Elasticidad del capital (a)</span><span class="sv" id="v-a">0.50</span></div>
+          <input type="range" data-p="a" min="0.1" max="1.5" step="0.05" value="0.5"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Tecnolog&iacute;a</div>
+        <div class="sr"><div class="sh"><span class="sn" id="sn-b">Elasticidad del trabajo (b)</span><span class="sv" id="v-b">0.50</span></div>
+          <input type="range" data-p="b" min="0.1" max="1.5" step="0.05" value="0.5"></div>
+        <div class="panel-note" id="nota-fam"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">En el punto elegido</div>
+      <div class="metric"><div class="ml">Capital k</div><div class="mv" id="m-k">&mdash;</div></div>
+      <div class="metric"><div class="ml">Trabajo l sobre la isocuanta</div><div class="mv" id="m-l">&mdash;</div></div>
+      <div class="metric"><div class="ml">TST = PM<sub>k</sub>/PM<sub>l</sub></div><div class="mv" id="m-tst">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Productividades marginales</div>
+      <div class="metric"><div class="ml">PM<sub>k</sub></div><div class="mv" id="m-pmk">&mdash;</div></div>
+      <div class="metric"><div class="ml">PM<sub>l</sub></div><div class="mv" id="m-pml">&mdash;</div></div>
+      <div class="metric"><div class="ml">Trabajo que libera 1 unidad m&aacute;s de capital</div><div class="mv" id="m-canje">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script src="produccion.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, bindTabs, bindPresets, initTools } = ICS;
+const { FP, dibujarIsocuanta } = Produccion;
+
+const defaults = { k: 10, q: 10, A: 1, a: 0.5, b: 0.5, tab: "cobb" };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { tangente: true, mapa: true };
+const layers        = Object.assign({}, layerDefaults);
+
+const presets = { varian: { tab: "cobb", A: 1, a: 1, b: 1, q: 100, k: 10 } };
+
+const format = { k: v => v.toFixed(1), q: v => v.toFixed(1), A: v => v.toFixed(2),
+                 a: v => v.toFixed(2), b: v => v.toFixed(2) };
+
+const pIso = new Plot("c-main", { height: 370 });
+const pTst = new Plot("c-tst",  { height: 370 });
+
+const MAXK = 40;
+
+function render() {
+  const s = state, fam = s.tab, f = FP[fam];
+  const p = { A: s.A, a: s.a, b: s.b };
+
+  document.getElementById("nota-fam").textContent = f.nota;
+  document.getElementById("ptitle").textContent = f.nombre + " · " + f.formula;
+  document.getElementById("sn-a").textContent =
+    fam === "cobb" ? "Elasticidad del capital (a)" : fam === "lineal" ? "Coeficiente α" : "Capital por unidad (a)";
+  document.getElementById("sn-b").textContent =
+    fam === "cobb" ? "Elasticidad del trabajo (b)" : fam === "lineal" ? "Coeficiente β" : "Trabajo por unidad (b)";
+
+  // trabajo que, con el capital elegido, deja la producción en q0
+  const lDe = k => {
+    if (fam === "cobb")   return Math.pow(s.q / (s.A * Math.pow(k, s.a)), 1 / s.b);
+    if (fam === "lineal") return (s.q / s.A - s.a * k) / s.b;
+    return s.b * s.q / s.A;
+  };
+  const lPunto = lDe(s.k);
+  const tst = f.tst(s.k, lPunto, p);
+
+  /* ---------- panel izquierdo: el mapa ---------- */
+  const maxL = Math.max(lDe(MAXK * 0.08), lPunto * 2.2, 10);
+  pIso.begin(MAXK, Math.min(maxL, 120)).grid()
+      .axes("Capital (k)", "Trabajo (l)", { skipQ: [s.k], skipP: [lPunto] });
+
+  pIso.push();
+  // conjunto de combinaciones que alcanzan al menos q0
+  const borde = f.isocuanta(s.q, p, MAXK).filter(pt => isFinite(pt[1]));
+  if (borde.length > 1) {
+    const poli = borde.map(pt => [pt[0], Math.min(pt[1], pIso.maxP * 1.5)]);
+    poli.push([MAXK * 1.5, pIso.maxP * 1.5], [poli[0][0], pIso.maxP * 1.5]);
+    pIso.area(poli, C.total);
+  }
+
+  if (layers.mapa)
+    [0.55, 0.78, 1.3, 1.7].forEach(kq =>
+      dibujarIsocuanta(pIso, fam, s.q * kq, p, "rgba(138,92,199,0.32)", { width: 1.4 }));
+  dibujarIsocuanta(pIso, fam, s.q, p, C.indif, { width: 2.6 });
+
+  // la tangente tiene pendiente −TST
+  if (layers.tangente && isFinite(tst)) {
+    const d = MAXK * 0.14;
+    pIso.seg(s.k - d, lPunto + tst * d, s.k + d, lPunto - tst * d, C.policy, { width: 1.9 });
+  }
+  pIso.pop();
+
+  pIso.seg(s.k, 0, s.k, lPunto, C.muted, { dash: [3, 3], width: 0.9 });
+  pIso.seg(0, lPunto, s.k, lPunto, C.muted, { dash: [3, 3], width: 0.9 });
+  pIso.dot(s.k, lPunto, C.txt);
+  pIso.tickQ(s.k, "k", C.txt);
+  pIso.tickP(lPunto, "l", C.txt);
+  pIso.label(s.k, lPunto, "q₀ = " + fmt.n(s.q, 1), C.txt, { dx: 8, dy: -8, box: true });
+
+  /* ---------- panel derecho: la TST a lo largo de la isocuanta ---------- */
+  const serie = [];
+  for (let i = 1; i <= 200; i++) {
+    const k = MAXK * i / 200, l = lDe(k);
+    if (l <= 0 || !isFinite(l)) continue;
+    const t = f.tst(k, l, p);
+    if (isFinite(t)) serie.push([k, t]);
+  }
+  const maxT = serie.length ? Math.min(Math.max(...serie.map(x => x[1])) * 1.15, (tst || 1) * 6) : 1;
+  pTst.begin(MAXK, Math.max(maxT, 0.1)).grid()
+      .axes("Capital (k)", "TST", { skipQ: [s.k], skipP: [tst] });
+  pTst.push();
+  if (serie.length) pTst.poly(serie, C.policy, { width: 2.6 });
+  pTst.pop();
+  if (isFinite(tst)) {
+    pTst.seg(s.k, 0, s.k, tst, C.muted, { dash: [3, 3], width: 0.9 });
+    pTst.seg(0, tst, s.k, tst, C.muted, { dash: [3, 3], width: 0.9 });
+    pTst.dot(s.k, tst, C.policy);
+    pTst.tickQ(s.k, "k", C.txt);
+    pTst.tickP(tst, fmt.n(tst, 2), C.policy);
+  } else {
+    pTst.label(MAXK / 2, Math.max(maxT, 0.1) / 2, "La TST no está definida en el vértice",
+      C.muted, { align: "center", box: true });
+  }
+
+  /* ---------- números ---------- */
+  const pmk = f.pmK(s.k, lPunto, p), pml = f.pmL(s.k, lPunto, p);
+  document.getElementById("m-k").textContent   = fmt.n(s.k);
+  document.getElementById("m-l").textContent   = isFinite(lPunto) && lPunto >= 0 ? fmt.n(lPunto) : "—";
+  document.getElementById("m-tst").textContent = isFinite(tst) ? fmt.n(tst, 3) : "no definida";
+  document.getElementById("m-pmk").textContent = isFinite(pmk) ? fmt.n(pmk, 3) : "—";
+  document.getElementById("m-pml").textContent = isFinite(pml) ? fmt.n(pml, 3) : "—";
+  document.getElementById("m-canje").textContent = isFinite(tst) ? fmt.n(tst, 3) + " unidades" : "—";
+
+  document.getElementById("algebra").innerHTML = fam === "cobb"
+    ? '<div class="step">Isocuanta:  A·k^a·l^b = q₀  ⇒  l(k) = (q₀ / (A·k^a))^(1/b)</div>' +
+      '<div class="step">TST = PM_k / PM_l = (a·l) / (b·k) = (' + fmt.n(s.a,2) + '·' + fmt.n(lPunto) + ') / (' +
+        fmt.n(s.b,2) + '·' + fmt.n(s.k) + ') = <span class="res">' + fmt.n(tst, 3) + '</span></div>' +
+      '<div class="step">Al subir k la TST cae: hace falta cada vez menos trabajo para compensar una unidad más de capital.</div>'
+    : fam === "lineal"
+    ? '<div class="step">Isocuanta:  A·(α·k + β·l) = q₀  ⇒  recta de pendiente −α/β</div>' +
+      '<div class="step">TST = PM_k / PM_l = α/β = <span class="res">' + fmt.n(tst, 3) + '</span>   (constante a lo largo de la isocuanta)</div>'
+    : '<div class="step">Isocuanta:  A·mín{k/a, l/b} = q₀  ⇒  vértice en k = ' + fmt.n(s.a * s.q / s.A) +
+        ', l = ' + fmt.n(s.b * s.q / s.A) + '</div>' +
+      '<div class="step">La TST no está definida: los factores no se sustituyen entre sí.</div>';
+
+  const nota = document.getElementById("note");
+  if (fam === "fijas") {
+    nota.textContent = "Con proporciones fijas la isocuanta tiene un vértice y nada más: el productor no puede cambiar " +
+      "capital por trabajo. Agregar solo uno de los dos factores no aumenta la producción, por eso los tramos de la L son planos.";
+  } else if (fam === "lineal") {
+    nota.textContent = "La isocuanta es una recta y la TST es constante (" + fmt.n(tst, 3) + "): da lo mismo en qué punto " +
+      "estemos, el productor siempre acepta el mismo canje entre capital y trabajo. Es el caso de factores perfectamente sustituibles.";
+  } else {
+    nota.textContent = "La TST es la pendiente de la isocuanta: cuántas unidades de trabajo se pueden soltar al sumar una unidad " +
+      "de capital sin cambiar la producción. Mueve k hacia la derecha y verás que la TST cae — ese es el mismo mecanismo de la " +
+      "TMS decreciente del consumidor, y es lo que hace convexas a las isocuantas.";
+  }
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+bindTabs(state, "tab", render);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, layers, layerDefaults, format, render,
+            canvas: "c-main", file: "m32-isocuantas-tst" });
+</script>
+</body>
+</html>

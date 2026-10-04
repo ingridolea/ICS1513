@@ -14,6 +14,8 @@ apps/shared.css     Estilos comunes
 apps/shared.js      Plot: dibuja en coordenadas de mercado (Q, P), no en píxeles
 apps/consumo.js     Motor de teoría del consumidor: familias de preferencias,
                     demandas marshallianas y descomposición de Slutsky
+apps/produccion.js  Motor de teoría del productor: funciones de producción,
+                    isocuantas, minimización de costos y costos de corto y largo plazo
 apps/mNN.html       Un módulo por archivo
 ics1513_apps.html   Versión anterior, intacta, para los links ya repartidos
 ```
@@ -80,6 +82,20 @@ Sitio estático puro: sin build, sin dependencias, sin backend.
 |---|---|---|
 | M30 | Efecto de presentación | El dilema de la enfermedad: elige, revela y compara |
 
+**Costos de los productores** (clases del 29-09-2026 y 05-10-2026)
+
+| | Módulo | Qué hace |
+|---|---|---|
+| M31 | Producto total, marginal y medio | Rendimientos marginales decrecientes con un factor variable |
+| M32 | Isocuantas y TST | Pendiente de la isocuanta, TST = PMₖ/PMₗ y TST decreciente |
+| M33 | Retornos a escala | f(αX) frente a α·f(X): constantes, crecientes y decrecientes |
+| M34 | Costos contables y económicos | El caso de Dante: costo explícito, implícito y de oportunidad |
+| M35 | Minimización de costos | Isocuantas e isocostos, tangencia TST = r/w |
+| M36 | Costo total, medio y marginal | Por qué el CM cruza al CMe justo en su mínimo |
+| M37 | Economías y deseconomías de escala | Del tipo de retornos a escala a la forma del costo medio |
+| M38 | Costos en el corto plazo | CF, CV, CFMe, CVMe, CMe y CM, con el ejercicio C = q² + 1 |
+| M39 | Corto plazo y largo plazo | La envolvente y el sobrecosto de tener el capital fijo |
+
 **Fallas de mercado** (módulos previos del repo)
 
 | | Módulo |
@@ -101,6 +117,13 @@ M27 usa la compensación **de Slutsky**, no la de Hicks: la renta compensada m�
 deja alcanzable la cesta *original*, que es exactamente como lo plantea la lámina del curso.
 Por eso la recta pivotada pasa por X y el punto Y queda en una curva de indiferencia distinta
 de la de X. Todo se deriva de la función de utilidad de cada familia: los puntos no están puestos a mano.
+
+## Una nota sobre los módulos de costos
+
+M35 a M39 derivan todo de la misma función de producción: la minimización de costos entrega
+k\*(q) y l\*(q), de ahí sale C(q), y de C(q) salen el costo medio y el marginal. La curva de
+largo plazo se calcula como el mínimo sobre k de la de corto plazo, así que la envolvente de
+M39 no está dibujada a mano: aparece sola.
 
 ## Convenciones de color
 

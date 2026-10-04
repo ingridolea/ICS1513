@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minimización de costos: isocuantas e isocostos — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Minimizaci&oacute;n de costos: isocuantas e isocostos</h1>
+  <span>M35 &middot; Costos de los productores</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tab" data-tab="cobb">Cobb-Douglas</button>
+    <button class="tab" data-tab="fijas">Proporciones fijas</button>
+    <button class="tab" data-tab="lineal">Factores sustitutos</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" data-preset="caro">Capital caro</button>
+    <button class="tool-btn" data-preset="barato">Capital barato</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Tangencia entre la isocuanta y la recta de isocosto</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-indif)" stroke-width="2.5"/></svg>Isocuanta f(k,l) = q&#8320;</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Isocosto del &oacute;ptimo &nbsp;r&middot;k + w&middot;l = C*</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-muted)" stroke-width="2" stroke-dasharray="5 3"/></svg>Otros isocostos</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-policy)" stroke-width="2.5" stroke-dasharray="5 3"/></svg>Combinaci&oacute;n que est&aacute;s explorando</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Precios de los factores</div>
+        <div class="sr"><div class="sh"><span class="sn">Precio del capital (r)</span><span class="sv" id="v-r">2.00</span></div>
+          <input type="range" data-p="r" min="0.5" max="6" step="0.1" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Salario (w)</span><span class="sv" id="v-w">2.00</span></div>
+          <input type="range" data-p="w" min="0.5" max="6" step="0.1" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Nivel de producci&oacute;n q&#8320;</span><span class="sv" id="v-q">10.0</span></div>
+          <input type="range" data-p="q" min="2" max="30" step="0.5" value="10"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Explorar la isocuanta</div>
+        <div class="sr"><div class="sh"><span class="sn">Capital de la combinaci&oacute;n explorada</span><span class="sv" id="v-kex">6.0</span></div>
+          <input type="range" data-p="kex" min="1" max="38" step="0.5" value="6"></div>
+        <div class="panel-note">Mueve esta combinaci&oacute;n por la isocuanta y compara la producci&oacute;n marginal
+          por peso gastado en cada factor.</div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Tecnolog&iacute;a</div>
+        <div class="sr"><div class="sh"><span class="sn" id="sn-a">Elasticidad del capital (a)</span><span class="sv" id="v-a">0.50</span></div>
+          <input type="range" data-p="a" min="0.1" max="1.2" step="0.05" value="0.5"></div>
+        <div class="sr"><div class="sh"><span class="sn" id="sn-b">Elasticidad del trabajo (b)</span><span class="sv" id="v-b">0.50</span></div>
+          <input type="range" data-p="b" min="0.1" max="1.2" step="0.05" value="0.5"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Combinaci&oacute;n &oacute;ptima</div>
+      <div class="metric"><div class="ml">Capital k*</div><div class="mv" id="m-k">&mdash;</div></div>
+      <div class="metric"><div class="ml">Trabajo l*</div><div class="mv" id="m-l">&mdash;</div></div>
+      <div class="metric"><div class="ml">Costo m&iacute;nimo C*</div><div class="mv" id="m-c">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">En la combinaci&oacute;n explorada</div>
+      <div class="metric"><div class="ml">PM<sub>k</sub>/r</div><div class="mv" id="m-rk">&mdash;</div></div>
+      <div class="metric"><div class="ml">PM<sub>l</sub>/w</div><div class="mv" id="m-rl">&mdash;</div></div>
+      <div class="metric"><div class="ml">Costo de esa combinaci&oacute;n</div><div class="mv" id="m-cex">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script src="produccion.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindTabs, bindPresets, initTools } = ICS;
+const { FP, dibujarIsocuanta, isocosto } = Produccion;
+
+const defaults = { r: 2, w: 2, q: 10, kex: 6, a: 0.5, b: 0.5, tab: "cobb" };
+const state    = Object.assign({}, defaults);
+
+const presets = {
+  caro:   { r: 4, w: 1.5 },
+  barato: { r: 1, w: 4 }
+};
+
+const format = { r: v => v.toFixed(2), w: v => v.toFixed(2), q: v => v.toFixed(1),
+                 kex: v => v.toFixed(1), a: v => v.toFixed(2), b: v => v.toFixed(2) };
+
+const plot = new Plot("c-main", { height: 410 });
+const MAXK = 40;
+
+function render() {
+  const s = state, fam = s.tab, f = FP[fam];
+  const p = { A: 1, a: s.a, b: s.b };
+
+  document.getElementById("ptitle").textContent = f.nombre + " · " + f.formula;
+  document.getElementById("sn-a").textContent =
+    fam === "cobb" ? "Elasticidad del capital (a)" : fam === "lineal" ? "Coeficiente α" : "Capital por unidad (a)";
+  document.getElementById("sn-b").textContent =
+    fam === "cobb" ? "Elasticidad del trabajo (b)" : fam === "lineal" ? "Coeficiente β" : "Trabajo por unidad (b)";
+
+  const opt = f.minimiza(s.r, s.w, s.q, p);
+
+  // el trabajo que mantiene la producción en q0 para el capital explorado
+  const lDe = k => {
+    if (fam === "cobb")   return Math.pow(s.q / (p.A * Math.pow(k, s.a)), 1 / s.b);
+    if (fam === "lineal") return (s.q / p.A - s.a * k) / s.b;
+    return s.b * s.q / p.A;
+  };
+  const kex = s.kex, lex = lDe(kex);
+  const cex = s.r * kex + s.w * lex;
+
+  const maxL = Math.max(opt.l * 2.4, lex * 1.4, s.q / (p.A * s.b) * 1.1, 10);
+  plot.begin(MAXK, Math.min(maxL, 140)).grid()
+      .axes("Capital (k)", "Trabajo (l)", { skipQ: [opt.k, kex], skipP: [opt.l] });
+
+  plot.push();
+  // familia de isocostos
+  [0.6, 0.8, 1.25, 1.55].forEach(kc =>
+    isocosto(plot, s.r, s.w, opt.C * kc, "rgba(66,66,67,0.22)", { width: 1.2, dash: [5, 3] }));
+  dibujarIsocuanta(plot, fam, s.q, p, C.indif, { width: 2.6 });
+  isocosto(plot, s.r, s.w, opt.C, C.demand, { width: 2.4 });
+  if (Math.abs(cex - opt.C) > opt.C * 0.004)
+    isocosto(plot, s.r, s.w, cex, C.policy, { width: 1.8, dash: [5, 3] });
+  plot.pop();
+
+  if (isFinite(lex) && lex >= 0) {
+    plot.dot(kex, lex, C.policy);
+    plot.label(kex, lex, "explorada", C.policy, { dx: 7, dy: 15, box: true });
+  }
+  plot.seg(opt.k, 0, opt.k, opt.l, C.muted, { dash: [3, 3], width: 0.9 });
+  plot.seg(0, opt.l, opt.k, opt.l, C.muted, { dash: [3, 3], width: 0.9 });
+  plot.dot(opt.k, opt.l, C.txt);
+  plot.tickQ(opt.k, "k*", C.txt);
+  plot.tickP(opt.l, "l*", C.txt);
+  plot.label(opt.k, opt.l, "óptimo", C.txt, { dx: 8, dy: -8, bold: true, box: true });
+
+  /* ---------- números ---------- */
+  const pmk = f.pmK(kex, lex, p), pml = f.pmL(kex, lex, p);
+  const rk = pmk / s.r, rl = pml / s.w;
+
+  document.getElementById("m-k").textContent  = fmt.n(opt.k);
+  document.getElementById("m-l").textContent  = fmt.n(opt.l);
+  document.getElementById("m-c").textContent  = fmt.n(opt.C);
+  document.getElementById("m-rk").textContent = isFinite(rk) ? fmt.n(rk, 3) : "—";
+  document.getElementById("m-rl").textContent = isFinite(rl) ? fmt.n(rl, 3) : "—";
+  document.getElementById("m-cex").textContent = isFinite(cex) ? fmt.n(cex) : "—";
+
+  const tstOpt = f.tst(opt.k, opt.l, p);
+  document.getElementById("algebra").innerHTML = fam === "cobb"
+    ? '<div class="step">Condición de tangencia:  TST = PM_k/PM_l = r/w</div>' +
+      '<div class="step">(a·l)/(b·k) = r/w  ⇒  l = (b·r)/(a·w) · k = ' +
+        fmt.n((s.b * s.r) / (s.a * s.w), 3) + ' · k</div>' +
+      '<div class="step">Reemplazando en la isocuanta q₀ = A·k^a·l^b:   <span class="res">k* = ' + fmt.n(opt.k) +
+        '</span>,  <span class="res">l* = ' + fmt.n(opt.l) + '</span></div>' +
+      '<div class="step">C* = r·k* + w·l* = ' + fmt.n(s.r, 2) + '·' + fmt.n(opt.k) + ' + ' + fmt.n(s.w, 2) + '·' +
+        fmt.n(opt.l) + ' = <span class="res">' + fmt.n(opt.C) + '</span></div>' +
+      '<div class="step">Equivalente:  PM_k/r = PM_l/w — la última unidad monetaria rinde lo mismo en los dos factores.</div>'
+    : fam === "lineal"
+    ? '<div class="step">Producción marginal por peso:  A·α/r = ' + fmt.n(p.A * s.a / s.r, 3) +
+        '   frente a   A·β/w = ' + fmt.n(p.A * s.b / s.w, 3) + '</div>' +
+      '<div class="step">La empresa usa solo el factor que rinde más:  <span class="res">k* = ' + fmt.n(opt.k) +
+        ', l* = ' + fmt.n(opt.l) + '</span>,  C* = <span class="res">' + fmt.n(opt.C) + '</span></div>'
+    : '<div class="step">Con proporciones fijas la receta está dada:  k* = a·q₀/A = ' + fmt.n(opt.k) +
+        ',  l* = b·q₀/A = ' + fmt.n(opt.l) + '</div>' +
+      '<div class="step">C* = r·k* + w·l* = <span class="res">' + fmt.n(opt.C) +
+        '</span>. Los precios no cambian la combinación, solo el costo.</div>';
+
+  const nota = document.getElementById("note");
+  if (fam === "fijas") {
+    nota.textContent = "Con proporciones fijas no hay tangencia que buscar: la receta es rígida y el óptimo está en el " +
+      "vértice de la isocuanta. Cambiar r o w mueve el costo total, pero no la combinación de factores.";
+  } else if (opt.esquina) {
+    nota.textContent = "Solución de esquina: con factores sustitutos perfectos la empresa gasta todo en el que rinde más " +
+      "por peso. No hay tangencia porque la isocuanta y el isocosto son ambos rectas.";
+  } else if (Math.abs(rk - rl) < 1e-6) {
+    nota.textContent = "Estás justo en el óptimo: la producción marginal por peso gastado es la misma en capital y trabajo, " +
+      "así que mover un peso de un factor al otro no abarata nada.";
+  } else if (rk > rl) {
+    nota.textContent = "En la combinación que exploras PM_k/r > PM_l/w: el último peso rinde más en capital, así que a la " +
+      "empresa le conviene usar más capital y menos trabajo. Mueve el slider hacia la derecha y verás que el isocosto " +
+      "punteado baja hasta tocar al del óptimo.";
+  } else {
+    nota.textContent = "En la combinación que exploras PM_l/w > PM_k/r: conviene mover gasto hacia el trabajo. " +
+      "Mueve el slider hacia la izquierda y el costo de esa combinación irá bajando hasta alcanzar C*.";
+  }
+}
+
+bindSliders(state, render, format);
+bindTabs(state, "tab", render);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m35-minimizacion-costos" });
+</script>
+</body>
+</html>

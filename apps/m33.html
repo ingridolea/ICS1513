@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Retornos a escala — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Retornos a escala</h1>
+  <span>M33 &middot; Costos de los productores</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tool-btn" data-preset="constantes">Constantes (a + b = 1)</button>
+    <button class="tool-btn" data-preset="crecientes">Crecientes (a + b &gt; 1)</button>
+    <button class="tool-btn" data-preset="decrecientes">Decrecientes (a + b &lt; 1)</button>
+    <span class="spacer"></span>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-title">Duplicar los insumos: de X a &alpha;X</div>
+      <canvas id="c-main"></canvas>
+    </div>
+    <div class="panel">
+      <div class="panel-title">f(&alpha;X) frente a &alpha;&middot;f(X)</div>
+      <canvas id="c-esc"></canvas>
+    </div>
+  </div>
+
+  <div class="panel-note" id="note" style="padding:0 4px"></div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-indif)" stroke-width="2.5"/></svg>Isocuantas</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-muted)" stroke-width="2" stroke-dasharray="5 3"/></svg>Rayo desde el origen: se escalan los dos factores</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-supply)" stroke-width="2.5"/></svg>Producci&oacute;n efectiva f(&alpha;X)</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5" stroke-dasharray="6 4"/></svg>Referencia proporcional &alpha;&middot;f(X)</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Escala</div>
+        <div class="sr"><div class="sh"><span class="sn">Factor de escala (&alpha;)</span><span class="sv" id="v-al">2.00</span></div>
+          <input type="range" data-p="al" min="1" max="3" step="0.05" value="2"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Cesta de partida X</div>
+        <div class="sr"><div class="sh"><span class="sn">Capital k&#8320;</span><span class="sv" id="v-k0">8.0</span></div>
+          <input type="range" data-p="k0" min="2" max="14" step="0.5" value="8"></div>
+        <div class="sr"><div class="sh"><span class="sn">Trabajo l&#8320;</span><span class="sv" id="v-l0">8.0</span></div>
+          <input type="range" data-p="l0" min="2" max="14" step="0.5" value="8"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Tecnolog&iacute;a &nbsp;f = A&middot;k^a&middot;l^b</div>
+        <div class="sr"><div class="sh"><span class="sn">Elasticidad del capital (a)</span><span class="sv" id="v-a">0.50</span></div>
+          <input type="range" data-p="a" min="0.1" max="1.2" step="0.05" value="0.5"></div>
+        <div class="sr"><div class="sh"><span class="sn">Elasticidad del trabajo (b)</span><span class="sv" id="v-b">0.50</span></div>
+          <input type="range" data-p="b" min="0.1" max="1.2" step="0.05" value="0.5"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">Producci&oacute;n</div>
+      <div class="metric"><div class="ml">f(X)</div><div class="mv" id="m-fx">&mdash;</div></div>
+      <div class="metric"><div class="ml">f(&alpha;X) &mdash; efectiva</div><div class="mv" id="m-fax">&mdash;</div></div>
+      <div class="metric"><div class="ml">&alpha;&middot;f(X) &mdash; proporcional</div><div class="mv" id="m-afx">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Diagn&oacute;stico</div>
+      <div class="metric"><div class="ml">a + b</div><div class="mv" id="m-suma">&mdash;</div></div>
+      <div class="metric"><div class="ml">Retornos a escala</div><div class="mv" id="m-tipo">&mdash;</div></div>
+      <div class="metric"><div class="ml">Producci&oacute;n por insumo escalado</div><div class="mv" id="m-ratio">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script src="produccion.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindPresets, initTools } = ICS;
+const { FP, dibujarIsocuanta } = Produccion;
+
+const defaults = { al: 2, k0: 8, l0: 8, a: 0.5, b: 0.5 };
+const state    = Object.assign({}, defaults);
+
+const presets = {
+  constantes:   { a: 0.5,  b: 0.5,  al: 2 },
+  crecientes:   { a: 0.7,  b: 0.7,  al: 2 },
+  decrecientes: { a: 0.35, b: 0.35, al: 2 }
+};
+
+const format = { al: v => v.toFixed(2), k0: v => v.toFixed(1), l0: v => v.toFixed(1),
+                 a: v => v.toFixed(2), b: v => v.toFixed(2) };
+
+const pIso = new Plot("c-main", { height: 360 });
+const pEsc = new Plot("c-esc",  { height: 360 });
+
+const AL_MAX = 3;
+
+function render() {
+  const s = state;
+  const p = { A: 1, a: s.a, b: s.b };
+  const f = (k, l) => FP.cobb.f(k, l, p);
+
+  const qX  = f(s.k0, s.l0);
+  const qAX = f(s.al * s.k0, s.al * s.l0);
+  const prop = s.al * qX;
+  const suma = s.a + s.b;
+
+  /* ---------- panel izquierdo: el rayo y las isocuantas ---------- */
+  const maxK = Math.max(s.k0 * AL_MAX, 14 * AL_MAX) * 0.78;
+  const maxL = maxK;
+  pIso.begin(maxK, maxL).grid()
+      .axes("Capital (k)", "Trabajo (l)", { skipQ: [s.k0, s.al * s.k0], skipP: [s.l0, s.al * s.l0] });
+
+  pIso.push();
+  // isocuantas de los dos niveles relevantes y de la referencia proporcional
+  dibujarIsocuanta(pIso, "cobb", qX,   p, C.indif, { width: 2.2 });
+  dibujarIsocuanta(pIso, "cobb", qAX,  p, C.supply, { width: 2.4 });
+  if (Math.abs(prop - qAX) > qX * 0.01)
+    dibujarIsocuanta(pIso, "cobb", prop, p, C.demand, { width: 1.8, dash: [6, 4] });
+  // el rayo: escalar los dos factores en la misma proporción
+  pIso.seg(0, 0, maxK, maxK * s.l0 / s.k0, C.muted, { width: 1.4, dash: [5, 3] });
+  pIso.pop();
+
+  pIso.dot(s.k0, s.l0, C.indif);
+  pIso.label(s.k0, s.l0, "X", C.txt, { dx: 7, dy: -7, bold: true, box: true });
+  pIso.dot(s.al * s.k0, s.al * s.l0, C.supply);
+  pIso.label(s.al * s.k0, s.al * s.l0, "αX", C.txt, { dx: 7, dy: -7, bold: true, box: true });
+
+  pIso.label(maxK * 0.97, maxL * 0.1, "f(X) = " + fmt.n(qX), C.indif, { align: "right", box: true });
+  pIso.label(maxK * 0.97, maxL * 0.02, "f(αX) = " + fmt.n(qAX), C.supply, { align: "right", box: true });
+
+  /* ---------- panel derecho: efectiva vs proporcional ---------- */
+  const efect = [], refer = [];
+  for (let i = 0; i <= 160; i++) {
+    const al = 1 + (AL_MAX - 1) * i / 160;
+    efect.push([al, f(al * s.k0, al * s.l0)]);
+    refer.push([al, al * qX]);
+  }
+  const maxY = Math.max(...efect.map(e => e[1]), ...refer.map(e => e[1])) * 1.12;
+  pEsc.begin(AL_MAX, maxY).grid()
+      .axes("Factor de escala (α)", "Producción", { skipQ: [s.al] });
+  pEsc.push();
+  pEsc.poly(refer, C.demand,  { width: 2, dash: [6, 4] });
+  pEsc.poly(efect, C.supply,  { width: 2.6 });
+  pEsc.pop();
+  pEsc.seg(s.al, 0, s.al, Math.max(qAX, prop), C.muted, { dash: [3, 3], width: 0.9 });
+  pEsc.dot(s.al, qAX,  C.supply);
+  pEsc.dot(s.al, prop, C.demand);
+  pEsc.tickQ(s.al, "α", C.txt);
+  if (Math.abs(qAX - prop) > maxY * 0.02)
+    pEsc.spanV(Math.min(qAX, prop), Math.max(qAX, prop), s.al,
+      (qAX > prop ? "+" : "") + fmt.n(qAX - prop), qAX > prop ? C.psLine : C.dwlLine);
+  pEsc.label(AL_MAX * 0.97, maxY * 0.9, "f(αX)", C.supply, { align: "right", box: true });
+  pEsc.label(AL_MAX * 0.97, maxY * 0.78, "α·f(X)", C.demand, { align: "right", box: true });
+
+  /* ---------- números ---------- */
+  const tipo = suma > 1.005 ? "crecientes" : suma < 0.995 ? "decrecientes" : "constantes";
+  document.getElementById("m-fx").textContent    = fmt.n(qX);
+  document.getElementById("m-fax").textContent   = fmt.n(qAX);
+  document.getElementById("m-afx").textContent   = fmt.n(prop);
+  document.getElementById("m-suma").textContent  = fmt.n(suma, 2);
+  document.getElementById("m-tipo").textContent  = tipo;
+  document.getElementById("m-ratio").textContent = prop > 0 ? fmt.n(qAX / prop, 3) : "—";
+
+  document.getElementById("algebra").innerHTML =
+    '<div class="step">f(αX) = A·(αk)^a·(αl)^b = α^(a+b) · A·k^a·l^b = α^(a+b) · f(X)</div>' +
+    '<div class="step">a + b = ' + fmt.n(suma, 2) + '   ⇒   f(αX) = α^' + fmt.n(suma, 2) + ' · f(X)</div>' +
+    '<div class="step">Con α = ' + fmt.n(s.al, 2) + ':  f(αX) = ' + fmt.n(qAX) +
+      '   frente a  α·f(X) = ' + fmt.n(prop) + '  ⇒  <span class="res">retornos ' + tipo + '</span></div>';
+
+  const nota = document.getElementById("note");
+  if (tipo === "constantes") {
+    nota.textContent = "Con a + b = 1 los retornos a escala son constantes: multiplicar ambos factores por α multiplica la " +
+      "producción exactamente por α. En el panel derecho las dos curvas se superponen, y en el izquierdo las isocuantas " +
+      "quedan a distancias iguales a lo largo del rayo.";
+  } else if (tipo === "crecientes") {
+    nota.textContent = "Con a + b = " + fmt.n(suma, 2) + " > 1 los retornos son crecientes: al multiplicar los insumos por " +
+      fmt.n(s.al, 2) + " la producción se multiplica por " + fmt.n(Math.pow(s.al, suma), 2) + ", más que proporcionalmente. " +
+      "Es la fuerza que Adam Smith atribuía a la división del trabajo y la especialización. En M37 verás que esto se traduce " +
+      "en economías de escala: el costo medio cae al producir más.";
+  } else {
+    nota.textContent = "Con a + b = " + fmt.n(suma, 2) + " < 1 los retornos son decrecientes: al multiplicar los insumos por " +
+      fmt.n(s.al, 2) + " la producción solo se multiplica por " + fmt.n(Math.pow(s.al, suma), 2) + ". " +
+      "Es el peso de las dificultades de gestión al crecer, y se traduce en deseconomías de escala. " +
+      "Ojo: esto es distinto de los rendimientos marginales decrecientes de M31, donde se mueve un solo factor.";
+  }
+}
+
+bindSliders(state, render, format);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, format, render, canvas: "c-main", file: "m33-retornos-escala" });
+</script>
+</body>
+</html>

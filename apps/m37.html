@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Economías y deseconomías de escala — ICS1513</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared.css">
+</head>
+<body>
+
+<header>
+  <h1>Econom&iacute;as y deseconom&iacute;as de escala</h1>
+  <span>M37 &middot; Costos de los productores</span>
+</header>
+
+<div class="app">
+
+  <div class="top-bar">
+    <button class="tool-btn" data-preset="constantes">Retornos constantes</button>
+    <button class="tool-btn" data-preset="crecientes">Retornos crecientes</button>
+    <button class="tool-btn" data-preset="decrecientes">Retornos decrecientes</button>
+    <span class="spacer"></span>
+    <button class="chip" data-layer="zonas"><span class="dot" style="background:var(--c-total-line)"></span>Marcar las dos zonas</button>
+    <button class="tool-btn" id="btn-reset">Reiniciar</button>
+    <button class="tool-btn" id="btn-png">Descargar PNG</button>
+  </div>
+
+  <div class="panels one">
+    <div class="panel">
+      <div class="panel-title" id="ptitle">Costo medio y costo marginal de largo plazo</div>
+      <canvas id="c-main"></canvas>
+      <div class="panel-note" id="note"></div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-cs-line)" stroke-width="2.5"/></svg>Costo medio CMe</span>
+    <span class="leg-item"><svg class="leg-line" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="var(--c-demand)" stroke-width="2.5"/></svg>Costo marginal CM</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-ps)"></span>Econom&iacute;as de escala: CM &lt; CMe</span>
+    <span class="leg-item"><span class="leg-swatch" style="background:var(--c-dwl)"></span>Deseconom&iacute;as de escala: CM &gt; CMe</span>
+  </div>
+
+  <div class="sliders-wrap">
+    <div class="sliders three">
+      <div class="slider-group">
+        <div class="group-label">Tecnolog&iacute;a &nbsp;f = k^a &middot; l^b</div>
+        <div class="sr"><div class="sh"><span class="sn">Elasticidad del capital (a)</span><span class="sv" id="v-a">0.50</span></div>
+          <input type="range" data-p="a" min="0.15" max="0.9" step="0.05" value="0.5"></div>
+        <div class="sr"><div class="sh"><span class="sn">Elasticidad del trabajo (b)</span><span class="sv" id="v-b">0.50</span></div>
+          <input type="range" data-p="b" min="0.15" max="0.9" step="0.05" value="0.5"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Precios y costo fijo</div>
+        <div class="sr"><div class="sh"><span class="sn">Precio del capital (r)</span><span class="sv" id="v-r">2.00</span></div>
+          <input type="range" data-p="r" min="0.5" max="6" step="0.1" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Salario (w)</span><span class="sv" id="v-w">2.00</span></div>
+          <input type="range" data-p="w" min="0.5" max="6" step="0.1" value="2"></div>
+        <div class="sr"><div class="sh"><span class="sn">Costo fijo (F)</span><span class="sv" id="v-F">8.00</span></div>
+          <input type="range" data-p="F" min="0" max="40" step="1" value="8"></div>
+      </div>
+      <div class="slider-group">
+        <div class="group-label">Nivel observado</div>
+        <div class="sr"><div class="sh"><span class="sn">Producci&oacute;n q</span><span class="sv" id="v-q">10.0</span></div>
+          <input type="range" data-p="q" min="1" max="40" step="0.5" value="10"></div>
+        <div class="panel-note">Con retornos constantes y sin costo fijo, CMe y CM son la misma horizontal.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="algebra" id="algebra"></div>
+
+  <div class="metrics-row">
+    <div class="mgroup three">
+      <div class="mgroup-label">En el nivel observado</div>
+      <div class="metric"><div class="ml">Costo medio CMe</div><div class="mv" id="m-cme">&mdash;</div></div>
+      <div class="metric"><div class="ml">Costo marginal CM</div><div class="mv" id="m-cm">&mdash;</div></div>
+      <div class="metric"><div class="ml">CM / CMe</div><div class="mv" id="m-ratio">&mdash;</div></div>
+    </div>
+    <div class="mgroup three">
+      <div class="mgroup-label">Escala</div>
+      <div class="metric"><div class="ml">a + b</div><div class="mv" id="m-suma">&mdash;</div></div>
+      <div class="metric"><div class="ml">Retornos a escala</div><div class="mv" id="m-ret">&mdash;</div></div>
+      <div class="metric"><div class="ml">Zona en la que est&aacute;s</div><div class="mv" id="m-zona">&mdash;</div></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="shared.js"></script>
+<script src="produccion.js"></script>
+<script>
+const { Plot, C, fmt, bindSliders, bindChips, bindPresets, initTools } = ICS;
+const { FP } = Produccion;
+
+const defaults = { a: 0.5, b: 0.5, r: 2, w: 2, F: 8, q: 10 };
+const state    = Object.assign({}, defaults);
+
+const layerDefaults = { zonas: true };
+const layers        = Object.assign({}, layerDefaults);
+
+const presets = {
+  constantes:   { a: 0.5,  b: 0.5,  F: 0 },
+  crecientes:   { a: 0.65, b: 0.65, F: 0 },
+  decrecientes: { a: 0.35, b: 0.35, F: 8 }
+};
+
+const format = { a: v => v.toFixed(2), b: v => v.toFixed(2), r: v => v.toFixed(2),
+                 w: v => v.toFixed(2), F: v => v.toFixed(2), q: v => v.toFixed(1) };
+
+const plot = new Plot("c-main", { height: 400 });
+const Q_MAX = 40;
+
+function render() {
+  const s = state;
+  const p = { A: 1, a: s.a, b: s.b };
+  const sEsc = s.a + s.b;
+
+  // costo de largo plazo derivado de la minimización: C(q) = F + k·q^(1/s)
+  const costo = q => s.F + FP.cobb.minimiza(s.r, s.w, q, p).C;
+  // el costo variable escala como q^(1/s), así que su marginal es (1/s)·CV/q
+  const marginal = q => (1 / sEsc) * (costo(q) - s.F) / q;
+
+  const Cq = costo(s.q), CMe = Cq / s.q, CM = marginal(s.q);
+
+  const serieCMe = [], serieCM = [];
+  for (let i = 1; i <= 300; i++) {
+    const q = Q_MAX * i / 300;
+    const c = costo(q);
+    serieCMe.push([q, c / q]);
+    serieCM.push([q, marginal(q)]);
+  }
+
+  // el cruce CM = CMe marca la frontera entre las dos zonas
+  let qCruce = NaN;
+  for (let i = 1; i < serieCMe.length; i++) {
+    const d0 = serieCM[i - 1][1] - serieCMe[i - 1][1];
+    const d1 = serieCM[i][1] - serieCMe[i][1];
+    if (d0 < 0 && d1 >= 0) { qCruce = serieCM[i][0]; break; }
+  }
+
+  const maxY = Math.min(
+    Math.max(...serieCMe.map(x => x[1]).slice(8), ...serieCM.map(x => x[1])) * 1.2,
+    CMe * 5);
+  plot.begin(Q_MAX, Math.max(maxY, 0.5)).grid()
+      .axes("Producción (q)", "Costo por unidad", { skipQ: [s.q, qCruce], skipP: [CMe, CM] });
+
+  // zonas de economías y deseconomías
+  if (layers.zonas && isFinite(qCruce)) {
+    plot.rect(0, 0, qCruce, plot.maxP, "rgba(120,196,130,0.14)");
+    plot.rect(qCruce, 0, Q_MAX, plot.maxP, "rgba(232,90,90,0.12)");
+    plot.seg(qCruce, 0, qCruce, plot.maxP * 0.92, C.totalLine, { width: 1.4, dash: [5, 3] });
+    plot.label(qCruce * 0.5, plot.maxP * 0.07, "Economías de escala", C.psLine, { align: "center", box: true });
+    plot.label(qCruce + (Q_MAX - qCruce) * 0.5, plot.maxP * 0.07, "Deseconomías de escala", C.dwlLine,
+      { align: "center", box: true });
+    plot.tickQ(qCruce, "q*", C.totalLine);
+  } else if (layers.zonas) {
+    const eco = CM < CMe - 1e-9;
+    plot.rect(0, 0, Q_MAX, plot.maxP, eco ? "rgba(120,196,130,0.12)" : "rgba(232,90,90,0.10)");
+    plot.label(Q_MAX * 0.5, plot.maxP * 0.07,
+      eco ? "Economías de escala en todo el rango" : "Deseconomías de escala en todo el rango",
+      eco ? C.psLine : C.dwlLine, { align: "center", box: true });
+  }
+
+  plot.push();
+  plot.poly(serieCMe, C.csLine, { width: 2.6 });
+  plot.poly(serieCM,  C.demand, { width: 2.6 });
+  plot.pop();
+
+  plot.seg(s.q, 0, s.q, Math.max(CMe, CM), C.muted, { dash: [3, 3], width: 0.9 });
+  plot.dot(s.q, CMe, C.csLine);
+  plot.dot(s.q, CM,  C.demand);
+  plot.tickQ(s.q, "q", C.policy);
+  plot.label(Q_MAX * 0.96, Math.max(maxY, 0.5) * 0.9, "CMe", C.csLine, { align: "right", box: true });
+  plot.label(Q_MAX * 0.96, Math.max(maxY, 0.5) * 0.79, "CM", C.demand, { align: "right", box: true });
+
+  /* ---------- números ---------- */
+  const tipoRet = sEsc > 1.005 ? "crecientes" : sEsc < 0.995 ? "decrecientes" : "constantes";
+  const zona = CM < CMe - 1e-6 ? "economías de escala"
+             : CM > CMe + 1e-6 ? "deseconomías de escala" : "en el límite";
+
+  document.getElementById("m-cme").textContent   = fmt.n(CMe, 3);
+  document.getElementById("m-cm").textContent    = fmt.n(CM, 3);
+  document.getElementById("m-ratio").textContent = fmt.n(CM / CMe, 3);
+  document.getElementById("m-suma").textContent  = fmt.n(sEsc, 2);
+  document.getElementById("m-ret").textContent   = tipoRet;
+  document.getElementById("m-zona").textContent  = zona;
+  document.getElementById("ptitle").textContent =
+    "Costo medio y marginal de largo plazo · retornos a escala " + tipoRet;
+
+  document.getElementById("algebra").innerHTML =
+    '<div class="step">Minimizando el costo con f = k^a·l^b se obtiene  C(q) = F + κ · q^(1/(a+b))</div>' +
+    '<div class="step">a + b = ' + fmt.n(sEsc, 2) + '  ⇒  el costo variable crece como q^' + fmt.n(1 / sEsc, 3) + '</div>' +
+    '<div class="step">Sin costo fijo:  CM / CMe = 1/(a+b) = <span class="res">' + fmt.n(1 / sEsc, 3) + '</span>' +
+      '   ⇒  ' + (sEsc > 1 ? "CM < CMe, economías de escala" :
+                  sEsc < 1 ? "CM > CMe, deseconomías de escala" : "CM = CMe, costo medio constante") + '</div>' +
+    (s.F > 0 ? '<div class="step">Con costo fijo F = ' + fmt.n(s.F, 2) + ' se suma el efecto de repartirlo entre más unidades, ' +
+      'que empuja el CMe hacia abajo al principio.</div>' : '');
+
+  const nota = document.getElementById("note");
+  if (isFinite(qCruce)) {
+    nota.textContent = "El costo medio tiene forma de U: al principio manda el reparto del costo fijo entre más unidades y el CMe cae; " +
+      "después pesan los retornos decrecientes a escala y el CMe sube. La frontera está en q* = " + fmt.n(qCruce) +
+      ", justo donde el costo marginal cruza al medio. A la izquierda hay economías de escala, a la derecha deseconomías.";
+  } else if (tipoRet === "constantes" && s.F === 0) {
+    nota.textContent = "Con retornos constantes a escala y sin costo fijo, duplicar los insumos duplica la producción y el costo. " +
+      "El costo medio no depende del nivel de producción: CMe y CM son la misma horizontal, tal como dice la lámina.";
+  } else if (CM < CMe) {
+    nota.textContent = "En todo este rango el costo marginal está bajo el medio, así que el CMe cae: hay economías de escala. " +
+      (sEsc > 1 ? "Vienen de los retornos crecientes (a + b = " + fmt.n(sEsc, 2) + " > 1): producir más rinde más que proporcionalmente."
+                : "Vienen de repartir el costo fijo entre más unidades.");
+  } else {
+    nota.textContent = "El costo marginal está sobre el medio en todo el rango, así que el CMe sube: hay deseconomías de escala. " +
+      "Con a + b = " + fmt.n(sEsc, 2) + " < 1, crecer cuesta más que proporcionalmente — son las dificultades de gestión " +
+      "que mencionaba Adam Smith.";
+  }
+}
+
+bindSliders(state, render, format);
+bindChips(layers, render);
+bindPresets(presets, state, render, format);
+initTools({ state, defaults, layers, layerDefaults, format, render,
+            canvas: "c-main", file: "m37-economias-escala" });
+</script>
+</body>
+</html>
